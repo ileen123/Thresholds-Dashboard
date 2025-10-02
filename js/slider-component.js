@@ -175,27 +175,17 @@ class VitalParameterSlider {
     }
 
     createEmbeddedSVG(svg, width, height) {
-        // Clear existing filled areas
+        // Clear existing filled areas - for prototype, we don't need the tight/mid/loose visualization
         const upperAreas = svg.querySelector('.upper-areas');
         const lowerAreas = svg.querySelector('.lower-areas');
         upperAreas.innerHTML = '';
         lowerAreas.innerHTML = '';
         
-        // Create the SVG elements for upper areas (from Tight.svg)
-        const upperSvgElements = [
-            { type: 'rect', attrs: { width: '100%', height: '100%', fill: '#ECEC3E' } },
-            { type: 'path', attrs: { d: 'M437 6.32426V131C355.986 117.7 142.332 93.6902 120.777 103.379C99.2214 113.068 78.3022 106.649 57.1498 70.4704L19 0L437 6.32426Z', fill: '#F0973E' } },
-            { type: 'path', attrs: { d: 'M437 0.5V73C361.607 65.5886 162.776 52.209 142.716 57.6082C122.656 63.0074 103.188 59.4301 83.503 39.2698L48 0.5H437Z', fill: '#EB4921' } },
-            { type: 'path', attrs: { d: 'M437 150.927V155H218.625H0.250488L0 0H4.5L12.7647 46.6505C15.5591 69.3794 31.7151 98.5862 45.2979 119.767C54.8349 126.31 63.7986 137.655 64.8242 147.802C65.8498 157.949 437 150.927 437 150.927Z', fill: '#00C877' } }
-        ];
+        // PROTOTYPE: Skip creating the colored area visualizations since SVG files were deleted
+        console.log('Prototype mode: Skipping tight/mid/loose visualization areas');
         
-        // Create the SVG elements for lower areas (from Tight_down.svg)
-        const lowerSvgElements = [
-            { type: 'rect', attrs: { width: '100%', height: '100%', fill: '#ECEC3E' } },
-            { type: 'path', attrs: { d: 'M437 148.676V24C355.986 37.3 142.332 61.3098 120.777 51.6209C99.2214 41.9319 78.3022 48.3515 57.1498 84.5296L19 155L437 148.676Z', fill: '#F0973E' } },
-            { type: 'path', attrs: { d: 'M437 154.5V82C361.607 89.4114 162.776 102.791 142.716 97.3918C122.656 91.9926 103.188 95.5699 83.503 115.73L48 154.5H437Z', fill: '#EB4921' } },
-            { type: 'path', attrs: { d: 'M437 4.07329V0H218.625H0.250488L0 155H4.5L12.7647 108.35C15.5591 85.6206 31.7151 56.4138 45.2979 35.2325C54.8349 28.6905 63.7986 17.3452 64.8242 7.19804C65.8498 -2.94916 437 4.07329 437 4.07329Z', fill: '#00C877' } }
-        ];
+        // Don't create any visual elements - just keep the sliders functional
+        return;
         
         // Add elements to upper areas
         upperSvgElements.forEach(elem => {
@@ -231,6 +221,10 @@ class VitalParameterSlider {
         const lowerAreas = svg.querySelector('.lower-areas');
         upperAreas.innerHTML = '';
         lowerAreas.innerHTML = '';
+        
+        // PROTOTYPE: Skip creating the colored area visualizations since SVG files were deleted
+        console.log(`Prototype mode: Skipping ${level} visualization areas`);
+        return;
         
         // Define correct SVG content for each monitoring level (copied from actual SVG files)
         const svgDefinitions = {

@@ -123,8 +123,8 @@
     left: 0;
     right: 40px;
     background: #00C877;
-    border-top: 2px dashed #ffffff;
-    border-bottom: 2px dashed #ffffff;
+    border-top: 2px solid #FC6039;
+    border-bottom: 2px solid #FC6039;
     pointer-events: none;
     z-index: 8;
     min-height: 2px;
