@@ -29,7 +29,7 @@
     <!-- Main page title -->
     <h1 class="main-title">Instellen Nieuwe Patiënt</h1>
     
-    <!-- Progress indicator showing current step (1-4) -->
+    <!-- Progress indicator showing current step (1-2) -->
     <div class="progress-bar">
         <div class="step">
             <div class="step-number">1</div>
@@ -37,10 +37,6 @@
         <div class="step-line"></div>
         <div class="step">
             <div class="step-number inactive">2</div>
-        </div>
-        <div class="step-line"></div>
-        <div class="step">
-            <div class="step-number inactive">3</div>
         </div>
         <div class="step-line"></div>
         <div class="step">
@@ -1083,7 +1079,7 @@
                         }
 
                         function updateProgressBar() {
-                            console.log('🔄 updateProgressBar called with selectedProblem:', selectedProblem, 'selectedRiskLevel:', selectedRiskLevel);
+                            console.log('🔄 updateProgressBar called with selectedProblem:', selectedProblem);
                             const stepNumbers = document.querySelectorAll('.step-number');
                             
                             // Reset all steps to inactive first
@@ -1098,21 +1094,17 @@
                                 stepNumbers[0].style.backgroundColor = '#1961AB';
                             }
                             
-                            // Step 2 becomes blue when problem is selected
-                            if (selectedProblem && stepNumbers[1]) {
-                                stepNumbers[1].classList.remove('inactive');
-                                stepNumbers[1].style.backgroundColor = '#1961AB';
-                            }
-                            
-                            // Steps 3 and ✓ become blue when risk level is selected
-                            if (selectedRiskLevel) {
+                            // When problem is selected, auto-complete all remaining steps
+                            if (selectedProblem) {
+                                // Step 2 becomes blue
+                                if (stepNumbers[1]) {
+                                    stepNumbers[1].classList.remove('inactive');
+                                    stepNumbers[1].style.backgroundColor = '#1961AB';
+                                }
+                                // Checkmark becomes blue (auto-complete)
                                 if (stepNumbers[2]) {
                                     stepNumbers[2].classList.remove('inactive');
                                     stepNumbers[2].style.backgroundColor = '#1961AB';
-                                }
-                                if (stepNumbers[3]) {
-                                    stepNumbers[3].classList.remove('inactive');
-                                    stepNumbers[3].style.backgroundColor = '#1961AB';
                                 }
                             }
                             
@@ -1121,8 +1113,7 @@
                             
                             // Update data manager with current progress
                             let completedSteps = 1; // Always start with step 1
-                            if (selectedProblem) completedSteps = 2;
-                            if (selectedRiskLevel) completedSteps = 4; // All steps complete
+                            if (selectedProblem) completedSteps = 3; // All steps complete when problem selected
                             
                             if (window.dataManager) {
                                 window.dataManager.setProgressStep(completedSteps);
@@ -1132,12 +1123,12 @@
                         function updateConfirmButton() {
                             const confirmBtn = document.getElementById('confirm-btn');
                             if (confirmBtn) {
-                                if (selectedProblem && selectedRiskLevel) {
-                                    // Both selections made - enable button
+                                if (selectedProblem) {
+                                    // Problem selected - enable button (simplified process)
                                     confirmBtn.classList.remove('disabled');
                                     confirmBtn.style.pointerEvents = 'auto';
                                 } else {
-                                    // Missing selection(s) - disable button
+                                    // No problem selected - disable button
                                     confirmBtn.classList.add('disabled');
                                     confirmBtn.style.pointerEvents = 'none';
                                 }
