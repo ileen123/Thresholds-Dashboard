@@ -661,9 +661,10 @@ body {
     background-color: #e3f2fd; /* Light blue background */
     padding: 12px; /* Reduced padding for better alignment */
     border-radius: 10px; /* Slightly smaller border radius */
-    margin: 0px -20px; /* Negative margins to extend to page edges */
+    margin: 40px -20px; /* Negative margins to extend to page edges */
     flex: 1; /* Take remaining space in form section */
     display: flex;
+    max-width: 400px;
     align-items: flex-start;
 }
 

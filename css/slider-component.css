@@ -109,13 +109,7 @@
     right: 40px;
     bottom: 30px;
     border-radius: 20px 0px 20px 0px;
-    background: linear-gradient(to bottom, 
-        #d4c5a9 0%, 
-        #f4e4a6 20%, 
-        #a8d8a8 40%, 
-        #a8d8a8 60%, 
-        #f4e4a6 80%, 
-        #d4c5a9 100%);
+    background: #f4e4a6;
 }
 
 .target-range-overlay {
