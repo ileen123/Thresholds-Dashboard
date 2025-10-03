@@ -88,16 +88,12 @@
         </div>
     </div>
 
-    <!-- Navigation section with back button -->
-    <div class="bottom-left-nav">
-        <button class="nav-button back-button" onclick="goBackToAlarmOverview()">
+    <!-- Navigation section with proper spacing -->
+    <div class="navigation">
+        <button class="nav-btn" onclick="goBackToAlarmOverview()">
             ← Terug naar Alarm Overzicht
         </button>
-    </div>
-
-    <!-- Bottom right navigation button -->
-    <div class="bottom-right-nav">
-        <button class="nav-button" onclick="goToOtherSettings()">Naar Overige →</button>
+        <button class="nav-btn" onclick="goToOtherSettings()">Naar Overige →</button>
     </div>
 
     <style>
@@ -485,43 +481,9 @@
             font-size: 14px;
             font-weight: 400;
         }
-        .nav-button {
-            background-color: transparent;
-            border: 2px solid #ff6b35;
-            border-radius: 20px;
-            padding: 10px 20px;
-            font-size: 16px;
-            font-weight: 600;
-            font-family: 'Open Sans', sans-serif;
-            color: #ff6b35;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-        }
+
         
-        .nav-button:hover {
-            background-color: #ff6b35;
-            border-color: #ff6b35;
-            color: white;
-            transform: translateY(-2px);
-        }
-        
-        /* Bottom right navigation button */
-        .bottom-right-nav {
-            position: fixed;
-            bottom: 63px;
-            right: 200px;
-            z-index: 1000;
-        }
-        
-        /* Bottom left navigation button - matching right button positioning */
-        .bottom-left-nav {
-            position: fixed;
-            bottom: 63px;
-            left: 200px;
-            z-index: 1000;
-        }
+        /* Navigation uses global styles from styles.css */
         
         .subtitle {
             text-align: left; /* Changed from center to left */

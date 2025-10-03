@@ -44,10 +44,9 @@ body {
     flex-direction: column;
 }
 
-/* Alarm overview page specific styling - prevent scrolling and adjust layout */
+/* Alarm overview page specific styling - natural content flow */
 .alarm-overview-page {
-    height: 100vh; /* Full viewport height */
-    overflow: hidden; /* Prevent scrolling */
+    min-height: 100vh; /* Minimum viewport height but allow content to determine actual height */
     padding: 20px 200px 20px 200px;
     display: flex;
     flex-direction: column;
@@ -711,8 +710,7 @@ body {
 /* Alarm overview page specific monitoring section adjustments */
 .alarm-overview-page .monitoring-section {
     margin-top: 20px; /* Increased spacing to move section lower */
-    flex: 1; /* Take remaining space */
-    overflow: hidden; /* Prevent content overflow */
+    flex: none; /* Let content determine height naturally */
 }
 
 /* Reduce monitoring section spacing on setup page */
@@ -1150,33 +1148,18 @@ body {
 .navigation {
     display: flex; /* Horizontal layout */
     justify-content: space-between; /* Space buttons apart */
-    margin-top: 60px; /* Increased spacing above navigation */
-    padding-top: 20px; /* Additional padding for visual separation */
+    margin-top: 25px; /* Reduced spacing above navigation */
     gap: 15px; /* Add space between buttons */
 }
 
-/* Alarm overview page specific navigation adjustments */
+/* Alarm overview page navigation - integrated with content */
 .alarm-overview-page .navigation {
-    position: fixed;
-    bottom: 63px;
-    left: 180px;
-    right: 180px;
-    background: white;
-    padding: 20px;
-    margin-top: 0;
-    z-index: 1000;
+    margin-top: 25px;
 }
 
-/* Fixed navigation for setup page */
+/* Setup page navigation - integrated with content */
 .setup-page .navigation {
-    position: fixed;
-    bottom: 20px;
-    left: 200px;
-    right: 200px;
-    background: white;
-    padding: 20px;
-    margin-top: 0;
-    z-index: 1000;
+    margin-top: 25px;
 }
 
 /* Base styling for navigation buttons */
@@ -1190,6 +1173,26 @@ body {
     font-size: 14px; /* Standard font size */
     font-weight: 600; /* Semibold for navigation buttons */
     font-family: 'Open Sans', sans-serif; /* Ensure Open Sans for nav buttons */
+    transition: all 0.2s ease;
+}
+
+.nav-btn:hover {
+    background-color: #ff6b35;
+    color: white;
+    transform: translateY(-1px);
+}
+
+/* Responsive navigation adjustments */
+@media (max-width: 768px) {
+    .navigation {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+    
+    .nav-btn {
+        text-align: center;
+    }
 }
 
 /* Primary action button (Confirm) styling */
