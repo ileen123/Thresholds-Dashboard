@@ -229,48 +229,67 @@
 
         /**
          * Synchronize all written displays with centralized target ranges
-         * Called on page load to ensure displays match the source of truth
+         * Called on page load and when problem profiles change to ensure displays match the source of truth
          */
         function syncDisplaysWithCentralizedRanges() {
-            console.log('🌐 SIMPLE SYNC: Updating alarm overview displays with global variables...');
+            console.log('🌐 SYNC: Updating alarm overview displays with current target ranges...');
 
-            // Update parameter displays - simple direct approach
+            // Get current target ranges for the patient (includes problem-specific ranges)
+            let targetRanges = null;
+            if (currentPatientId && window.sharedDataManager) {
+                targetRanges = window.sharedDataManager.getPatientTargetRanges(currentPatientId);
+                console.log('📊 Current patient target ranges:', targetRanges);
+            }
+
+            // If no patient-specific ranges, fall back to global variables (for manual adjustments)
+            if (!targetRanges) {
+                targetRanges = {
+                    HR: { min: window.HR_MIN || 70, max: window.HR_MAX || 110 },
+                    BP_Mean: { min: window.BP_MIN || 65, max: window.BP_MAX || 85 },
+                    Saturatie: { min: window.SAT_MIN || 92, max: window.SAT_MAX || 100 },
+                    AF: { min: window.AF_MIN || 12, max: window.AF_MAX || 20 },
+                    Temperature: { min: window.TEMP_MIN || 36.0, max: window.TEMP_MAX || 38.5 }
+                };
+                console.log('📊 Using fallback global ranges:', targetRanges);
+            }
+
+            // Update parameter displays
             const valueNumbers = document.querySelectorAll('.value-number');
             
             if (valueNumbers.length >= 5) {
-                // Update HR display from global variables
-                if (valueNumbers[0]) {
-                    valueNumbers[0].textContent = `${window.HR_MIN} - ${window.HR_MAX} bpm`;
+                // Update HR display
+                if (valueNumbers[0] && targetRanges.HR) {
+                    valueNumbers[0].textContent = `${targetRanges.HR.min} - ${targetRanges.HR.max} bpm`;
                     console.log('📊 Updated HR display:', valueNumbers[0].textContent);
                 }
 
-                // Update BP display from global variables
-                if (valueNumbers[1]) {
-                    valueNumbers[1].textContent = `${window.BP_MIN} - ${window.BP_MAX} mmHg`;
+                // Update BP display
+                if (valueNumbers[1] && targetRanges.BP_Mean) {
+                    valueNumbers[1].textContent = `${targetRanges.BP_Mean.min} - ${targetRanges.BP_Mean.max} mmHg`;
                     console.log('📊 Updated BP display:', valueNumbers[1].textContent);
                 }
 
-                // Update Saturatie display from global variables
-                if (valueNumbers[2]) {
-                    valueNumbers[2].textContent = `${window.SAT_MIN} - ${window.SAT_MAX}%`;
+                // Update Saturatie display
+                if (valueNumbers[2] && targetRanges.Saturatie) {
+                    valueNumbers[2].textContent = `${targetRanges.Saturatie.min} - ${targetRanges.Saturatie.max}%`;
                     console.log('📊 Updated Saturatie display:', valueNumbers[2].textContent);
                 }
 
-                // Update AF display from global variables
+                // Update AF display
                 const afDisplay = document.getElementById('af-range-display');
-                if (afDisplay) {
-                    afDisplay.textContent = `${window.AF_MIN} - ${window.AF_MAX} /min`;
+                if (afDisplay && targetRanges.AF) {
+                    afDisplay.textContent = `${targetRanges.AF.min} - ${targetRanges.AF.max} /min`;
                     console.log('📊 Updated AF display:', afDisplay.textContent);
                 }
 
-                // Update Temperature display from global variables
-                if (valueNumbers[4]) {
-                    valueNumbers[4].textContent = `${window.TEMP_MIN} - ${window.TEMP_MAX}°C`;
+                // Update Temperature display
+                if (valueNumbers[4] && targetRanges.Temperature) {
+                    valueNumbers[4].textContent = `${targetRanges.Temperature.min} - ${targetRanges.Temperature.max}°C`;
                     console.log('📊 Updated Temperature display:', valueNumbers[4].textContent);
                 }
             }
 
-            console.log('✅ All alarm overview displays updated with global variables');
+            console.log('✅ All alarm overview displays updated with current target ranges');
         }
 
         // Initialize page when DOM is loaded
@@ -1349,6 +1368,12 @@
             console.log('🎯 MAIN PROBLEM CHANGE - Calling updateOrganCircles(true)...');
             updateOrganCircles(true); // MANUAL PROBLEM CHANGE: Overwrite manual adjustments
             
+            // Update parameter displays immediately after problem change
+            setTimeout(() => {
+                console.log('🎯 MAIN PROBLEM CHANGE - Updating displays for new problem');
+                syncDisplaysWithCentralizedRanges();
+            }, 200);
+            
             // Save current medical info including the problem selection
             if (currentPatientId && window.sharedDataManager) {
                 const currentMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
@@ -1442,6 +1467,9 @@
             
             // Update monitoring status after all circles are updated
             setTimeout(() => updateMonitoringStatus(), 100);
+            
+            // Update parameter displays with new target ranges
+            setTimeout(() => syncDisplaysWithCentralizedRanges(), 150);
             
             // Update opacity for all monitoring elements
             updateAllOpacity(isActivated);

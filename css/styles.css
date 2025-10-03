@@ -1167,7 +1167,7 @@ body {
     padding: 10px 20px; /* Internal spacing */
     border: 2px solid #ff6b35; /* Orange border */
     border-radius: 20px; /* Rounded pill shape */
-    background: white; /* White background */
+    background: transparent; /* Transparent background */
     color: #ff6b35; /* Orange text */
     cursor: pointer; /* Hand cursor on hover */
     font-size: 14px; /* Standard font size */
