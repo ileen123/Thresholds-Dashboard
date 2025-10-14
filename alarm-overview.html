@@ -110,20 +110,7 @@
                 </select>
             </div>
         </div>
-        
-        <!-- Section 2: Risk level selection -->
-        <div class="form-section">
-            <h2 class="section-title">Wat is het risico - level van de patiënt?</h2>
-            <div class="button-group">
-                <button class="btn risk-low" data-risk="low">Laag</button>
-                <button class="btn risk-mid" data-risk="mid">Mid</button>
-                <button class="btn risk-high" data-risk="high">Hoog</button>
-            </div>
-            <!-- Static alarm indicator SVG -->
-            <div class="alarm-indicator-svg">
-                <img src="svg's/alarm_indicator.svg" alt="Alarm Indicator" />
-            </div>
-        </div>
+
         
         <!-- Section 3: Additional medical conditions/tags -->
         <div class="form-section">
@@ -162,8 +149,7 @@
         <div class="monitoring-grid">
             <!-- Circulatory system -->
             <div class="monitor-item">
-                <div id="heart-circle-container"></div>
-                <div id="heart-status" class="monitor-status inactive-text">los</div>
+
                 <!-- Circulatory parameters -->
                 <div class="value-card">
                     <div class="organ-title-container">
@@ -191,8 +177,7 @@
             </div>
             <!-- Respiratory system -->
             <div class="monitor-item">
-                <div id="lung-circle-container"></div>
-                <div id="lung-status" class="monitor-status inactive-text">los</div>
+
                 <!-- Respiratory parameters -->
                 <div class="value-card">
                     <div class="organ-title-container">
@@ -220,8 +205,6 @@
             </div>
             <!-- Other/Temperature system -->
             <div class="monitor-item">
-                <div id="temp-circle-container"></div>
-                <div id="temp-status" class="monitor-status inactive-text">los</div>
                 <!-- Temperature parameters -->
                 <div class="value-card">
                     <div class="organ-title-container">
@@ -1174,67 +1157,6 @@
                 });
             }
 
-            // Set up risk level button listeners
-            const riskButtons = document.querySelectorAll('.btn.risk-low, .btn.risk-mid, .btn.risk-high');
-            riskButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    // Store the old risk level for comparison
-                    const oldRiskLevel = selectedRiskLevel;
-                    
-                    // Remove selected class from all risk buttons
-                    riskButtons.forEach(btn => btn.classList.remove('selected'));
-                    // Add selected class to clicked button
-                    this.classList.add('selected');
-                    
-                    // Get risk level and update circles
-                    const riskLevel = this.classList.contains('risk-low') ? 'low' : 
-                                     this.classList.contains('risk-high') ? 'high' : 'mid';
-                    selectedRiskLevel = riskLevel;
-                    console.log('Risk button clicked, detected risk level:', selectedRiskLevel);
-                    updateOrganCirclesWithRisk(riskLevel);
-                    
-                    // Update monitoring status text after circles are updated
-                    setTimeout(() => updateMonitoringStatus(), 100);
-                    
-                    // Apply riskMatrix logic based on current medical problem and new overall risk level
-                    if (currentPatientId && window.sharedDataManager) {
-                        console.log(`🔄 Updating overall risk level to: ${riskLevel} for patient ${currentPatientId}`);
-                        
-                        // Get the current medical problem
-                        const medicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId);
-                        const selectedProblem = medicalInfo?.selectedProblem || 'none';
-                        
-                        console.log(`🎯 Applying riskMatrix for problem: ${selectedProblem} with risk: ${riskLevel}`);
-                        
-                        // Apply problem-specific monitoring with the new overall risk level
-                        const result = window.sharedDataManager.applyProblemSpecificMonitoring(
-                            selectedProblem,
-                            window.organComponents, // Pass the organ components for visual updates
-                            currentPatientId,
-                            riskLevel,
-                            true // shouldOverwriteManualAdjustments = true for overall risk changes
-                        );
-                        
-                        console.log(`✅ Applied riskMatrix calculation:`, result.organStates);
-                        console.log(`📋 Medical reasoning:`, result.reasoning);
-                        
-                        // Update monitoring status labels after risk level change
-                        setTimeout(() => updateMonitoringStatus(), 100);
-                        
-                        // Log the change but don't highlight for risk level changes
-                        if (result.targetRanges && oldRiskLevel !== riskLevel) {
-                            console.log(`📊 Risk level changed from ${oldRiskLevel} to ${riskLevel} - no highlighting needed`);
-                        }
-                        
-                        // Save the risk level to patient medical info for bed overview color updates
-                        const currentMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
-                        currentMedicalInfo.selectedRiskLevel = riskLevel;
-                        currentMedicalInfo.lastUpdated = new Date().toISOString();
-                        window.sharedDataManager.savePatientMedicalInfo(currentPatientId, currentMedicalInfo);
-                        console.log('✅ Risk level saved to patient medical info for bed overview color update:', riskLevel);
-                    }
-                });
-            });
 
             // Event listeners for tag buttons (matching setup page structure)
             document.querySelectorAll('.tag-btn').forEach(button => {
@@ -1382,12 +1304,6 @@
                     }
                 }
                     
-                // Load risk level
-                if (savedMedicalInfo.selectedRiskLevel) {
-                    selectedRiskLevel = savedMedicalInfo.selectedRiskLevel;
-                    console.log('✅ DEBUG: Loading risk level:', selectedRiskLevel);
-                    selectRiskLevel(selectedRiskLevel);
-                }
                 
                 // Load tags - but verify condition states against SharedDataManager
                 if (savedMedicalInfo.selectedTags && Array.isArray(savedMedicalInfo.selectedTags)) {
@@ -1401,8 +1317,8 @@
                 console.log('✅ DEBUG: Loaded existing settings:', savedMedicalInfo);
                 
                 // Update organ circles based on loaded data
-                if (selectedProblem && selectedRiskLevel) {
-                    console.log('✅ DEBUG: Updating organ circles with:', selectedProblem, selectedRiskLevel);
+                if (selectedProblem) {
+                    console.log('✅ DEBUG: Updating organ circles with:', selectedProblem);
                     updateOrganCircles(false); // PAGE LOAD: Preserve manual adjustments
                 }
             } else {
@@ -1858,10 +1774,13 @@
         function saveAlarmSettings() {
             console.log('Saving alarm settings...');
             
-            if (!selectedProblem || !selectedRiskLevel) {
-                alert('Selecteer eerst een hoofdprobleem en risico niveau voordat je opslaat.');
+            if (!selectedProblem) {
+                alert('Selecteer eerst een hoofdprobleem voordat je opslaat.');
                 return;
             }
+            
+            // Set default risk level to mid
+            const selectedRiskLevel = 'mid';
             
             // Get organ settings from SharedDataManager
             const organSettings = window.sharedDataManager.getOrganSettings();
@@ -1996,20 +1915,7 @@
             console.log('🎯 Current selectedProblem:', selectedProblem);
             console.log('🎯 Current selectedRiskLevel:', selectedRiskLevel);
             console.log('🎯 isActivated:', isActivated);
-            
-            // Update monitoring status labels after applying problem-specific monitoring
-            setTimeout(() => updateMonitoringStatus(), 100);
-            
-            // Log monitoring level synchronization that happens automatically in SharedDataManager
-            if (currentPatientId && window.sharedDataManager) {
-                console.log('📊 Monitoring levels automatically synchronized by SharedDataManager:');
-                setTimeout(() => {
-                    const heartLevel = window.sharedDataManager.getHeartMonitoringLevel(currentPatientId);
-                    const lungLevel = window.sharedDataManager.getLungMonitoringLevel(currentPatientId);
-                    const tempLevel = window.sharedDataManager.getTempMonitoringLevel(currentPatientId);
-                    console.log(`   - Heart: ${heartLevel}, Lung: ${lungLevel}, Temp: ${tempLevel}`);
-                }, 50);
-            }
+
             
             // Update organ settings (organ components already updated by centralized function)
             if (finalOrganStates.heart) {
