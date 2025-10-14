@@ -184,8 +184,7 @@
             <!-- Other/Temperature system -->
             <div class="monitor-item">
                 <div class="monitor-label inactive-text">Overig</div>
-                <div id="temp-circle-container"></div>
-                <div id="temp-status" class="monitor-status inactive-text">los</div>
+
                 <!-- Temperature parameters -->
                 <div class="value-card">
                     <div class="parameter-group">
@@ -616,104 +615,7 @@
                                 });
                             }
                             
-                            // Set up risk level button listeners
-                            const riskButtons = document.querySelectorAll('.btn.risk-low, .btn.risk-mid, .btn.risk-high');
-                            riskButtons.forEach(button => {
-                                button.addEventListener('click', function() {
-                                    console.log('\n🟡 === RISK BUTTON CLICKED ===');
-                                    
-                                    // Store the old risk level for highlighting comparison
-                                    const oldRiskLevel = selectedRiskLevel;
-                                    
-                                    // Remove selected class from all risk buttons
-                                    riskButtons.forEach(btn => btn.classList.remove('selected'));
-                                    // Add selected class to clicked button
-                                    this.classList.add('selected');
-                                    
-                                    // Get risk level and update circles
-                                    const riskLevel = this.classList.contains('risk-low') ? 'low' : 
-                                                     this.classList.contains('risk-high') ? 'high' : 'mid';
-                                    console.log('🔵 Risk button clicked, detected risk level:', riskLevel);
-                                    console.log('🔵 Current selectedProblem:', selectedProblem);
-                                    console.log('🔵 Old risk level:', oldRiskLevel, '→ New risk level:', riskLevel);
-                                    
-                                    // Debug organ components before update
-                                    console.log('🔧 Organ components before update:', window.organComponents);
-                                    if (window.organComponents) {
-                                        console.log('🔧 Heart level before:', window.organComponents.heart?.getRiskLevel?.());
-                                        console.log('🔧 Lung level before:', window.organComponents.lung?.getRiskLevel?.());
-                                        console.log('🔧 Temp level before:', window.organComponents.temp?.getRiskLevel?.());
-                                    }
-                                    
-                                    selectedRiskLevel = riskLevel;
-                                    console.log('🔵 selectedRiskLevel is now:', selectedRiskLevel);
-                                    window.dataManager?.setSelectedRiskLevel(riskLevel);
-                                    
-                                    // IMMEDIATE SAVE: Save risk level selection to SharedDataManager immediately
-                                    // so that tag clicks can access the current problem/risk context
-                                    if (currentPatientId && window.sharedDataManager) {
-                                        const existingMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
-                                        const updatedMedicalInfo = {
-                                            ...existingMedicalInfo,
-                                            selectedProblem: selectedProblem,
-                                            selectedRiskLevel: selectedRiskLevel,
-                                            selectedTags: selectedTags,
-                                            lastUpdated: new Date().toISOString()
-                                        };
-                                        window.sharedDataManager.savePatientMedicalInfo(currentPatientId, updatedMedicalInfo);
-                                        console.log('💾 Immediately saved risk level selection to SharedDataManager:', selectedRiskLevel);
-                                        
-                                        // NEW: Apply intelligent highlighting for risk level changes
-                                        if (oldRiskLevel && oldRiskLevel !== riskLevel && selectedProblem) {
-                                            console.log('📊 Risk level changed - no highlighting needed');
-                                        }
-                                    }
-                                    
-                                    updateOrganCirclesWithRisk(riskLevel);
-                                    
-                                    // CRITICAL FIX: When risk level changes, we need to recalculate ALL monitoring levels 
-                                    // including tag adjustments, not just apply basic risk level
-                                    if (currentPatientId && window.sharedDataManager && selectedProblem) {
-                                        console.log('🔧 RECALCULATING complete monitoring levels after risk level change...');
-                                        console.log('🔧 Current context:', { selectedProblem, riskLevel, selectedTags });
-                                        
-                                        // Use applyProblemSpecificMonitoring to recalculate everything properly
-                                        // This will: 1) Get base levels from problem+risk, 2) Apply tag deltas, 3) Save to SharedDataManager
-                                        const result = window.sharedDataManager.applyProblemSpecificMonitoring(
-                                            selectedProblem,
-                                            window.organComponents, // Pass the organ components for visual updates
-                                            currentPatientId,
-                                            riskLevel,
-                                            true // shouldOverwriteManualAdjustments = true for risk level changes
-                                        );
-                                        
-                                        console.log('✅ Recalculated monitoring levels with tags:', result.organStates);
-                                        console.log('📋 Medical reasoning:', result.reasoning);
-                                        
-                                        // Update monitoring status labels immediately
-                                        setTimeout(() => updateMonitoringStatus(), 150);
-                                    } else {
-                                        console.log('⚠️ Cannot recalculate monitoring levels - missing context:', {
-                                            currentPatientId: !!currentPatientId,
-                                            sharedDataManager: !!window.sharedDataManager,
-                                            selectedProblem: selectedProblem
-                                        });
-                                    }
-                                    
-                                    // Debug organ components after update
-                                    setTimeout(() => {
-                                        console.log('🔧 Organ components after update:', window.organComponents);
-                                        if (window.organComponents) {
-                                            console.log('🔧 Heart level after:', window.organComponents.heart?.getRiskLevel?.());
-                                            console.log('🔧 Lung level after:', window.organComponents.lung?.getRiskLevel?.());
-                                            console.log('🔧 Temp level after:', window.organComponents.temp?.getRiskLevel?.());
-                                        }
-                                        console.log('🟡 === END RISK BUTTON CLICK ===\n');
-                                    }, 100);
-                                    
-                                    updateProgressBar(); // Update progress when risk level is selected
-                                });
-                            });
+                         
                             
                             // Set up tag button listeners
                             const tagButtons = document.querySelectorAll('.tags-section .btn:not(.more-btn)');
@@ -991,15 +893,6 @@
                             updateOrganCircles();
                         }
                         
-                        // Function to update organ circles based on risk level
-                        function updateOrganCirclesWithRisk(riskLevel) {
-                            console.log('🔄 updateOrganCirclesWithRisk called with:', riskLevel);
-                            console.log('🔄 Current selectedProblem:', selectedProblem);
-                            console.log('🔄 Setting selectedRiskLevel to:', riskLevel);
-                            selectedRiskLevel = riskLevel;
-                            console.log('🔄 Calling updateOrganCircles...');
-                            updateOrganCircles();
-                        }
 
                         function initializeSepsisTagState() {
                             console.log('🏥 Initializing condition states on setup page...');
@@ -1058,7 +951,7 @@
             // Use the centralized function from SharedDataManager that handles both monitoring levels and target ranges
             console.log('🔧 Calling applyProblemSpecificMonitoring with:');
             console.log('   - Problem:', selectedProblem);
-            console.log('   - Risk Level:', selectedRiskLevel);
+
             console.log('   - Organ Components:', window.organComponents);
             
             // If no problem is selected, use default but still apply risk level logic
@@ -1572,31 +1465,26 @@
                                 stepNumbers[0].style.backgroundColor = '#1961AB';
                             }
                             
-                            // Step 2 becomes blue when problem is selected
-                            if (selectedProblem && stepNumbers[1]) {
-                                stepNumbers[1].classList.remove('inactive');
-                                stepNumbers[1].style.backgroundColor = '#1961AB';
-                            }
-                            
-                            // Steps 3 and ✓ become blue when risk level is selected
-                            if (selectedRiskLevel) {
+                             // When problem is selected, auto-complete all remaining steps
+                            if (selectedProblem) {
+                                // Step 2 becomes blue
+                                if (stepNumbers[1]) {
+                                    stepNumbers[1].classList.remove('inactive');
+                                    stepNumbers[1].style.backgroundColor = '#1961AB';
+                                }
+                                // Checkmark becomes blue (auto-complete)
                                 if (stepNumbers[2]) {
                                     stepNumbers[2].classList.remove('inactive');
                                     stepNumbers[2].style.backgroundColor = '#1961AB';
-                                }
-                                if (stepNumbers[3]) {
-                                    stepNumbers[3].classList.remove('inactive');
-                                    stepNumbers[3].style.backgroundColor = '#1961AB';
                                 }
                             }
                             
                             // Update confirm button state
                             updateConfirmButton();
                             
-                            // Update data manager with current progress
+                           // Update data manager with current progress
                             let completedSteps = 1; // Always start with step 1
-                            if (selectedProblem) completedSteps = 2;
-                            if (selectedRiskLevel) completedSteps = 4; // All steps complete
+                            if (selectedProblem) completedSteps = 3; // All steps complete when problem selected
                             
                             if (window.dataManager) {
                                 window.dataManager.setProgressStep(completedSteps);
@@ -1606,12 +1494,12 @@
                         function updateConfirmButton() {
                             const confirmBtn = document.getElementById('confirm-btn');
                             if (confirmBtn) {
-                                if (selectedProblem && selectedRiskLevel) {
-                                    // Both selections made - enable button
+                                if (selectedProblem) {
+                                    // Problem selected - enable button (simplified process)
                                     confirmBtn.classList.remove('disabled');
                                     confirmBtn.style.pointerEvents = 'auto';
                                 } else {
-                                    // Missing selection(s) - disable button
+                                    // No problem selected - disable button
                                     confirmBtn.classList.add('disabled');
                                     confirmBtn.style.pointerEvents = 'none';
                                 }
@@ -1671,25 +1559,27 @@
                                 return; // Don't execute if button is disabled
                             }
                             
-                            console.log('confirmSettings called - selectedRiskLevel:', selectedRiskLevel);
+
                             console.log('confirmSettings called - selectedProblem:', selectedProblem);
                             
-                            if (!selectedProblem || !selectedRiskLevel) {
-                                alert('Selecteer eerst een hoofdprobleem en risico niveau voordat je doorgaat.');
+                            if (!selectedProblem) {
+                                alert('Selecteer eerst een hoofdprobleem voordat je doorgaat.');
                                 return;
                             }
                             
                             const organSettings = window.dataManager?.getCurrentSession()?.organSettings || {};
                             const activeOrgans = Object.keys(organSettings).filter(organ => organSettings[organ].active);
                             
+                            // Set default risk level to mid
+                            const selectedRiskLevel = 'mid';
+                            
                             const summary = 
                                 'Overzicht instellingen:\n' +
                                 '- Hoofdprobleem: ' + selectedProblem + '\n' +
-                                '- Risico niveau: ' + selectedRiskLevel + '\n' +
                                 '- Additionele tags: ' + (selectedTags.length > 0 ? selectedTags.join(', ') : 'Geen') + '\n' +
                                 '- Actieve monitoring: ' + (activeOrgans.length > 0 ? activeOrgans.join(', ') : 'Geen');
                             
-                            if (1==1) {
+                           if (confirm(summary + '\n\nWil je deze instellingen bevestigen?')) {
                                 // Save all the selected data to patient-data.json
                                 if (window.dataManager) {
                                     window.dataManager.setSelectedProblem(selectedProblem);
