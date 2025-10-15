@@ -44,10 +44,9 @@ body {
     flex-direction: column;
 }
 
-/* Alarm overview page specific styling - prevent scrolling and adjust layout */
+/* Alarm overview page specific styling - natural content flow */
 .alarm-overview-page {
-    height: 100vh; /* Full viewport height */
-    overflow: hidden; /* Prevent scrolling */
+    min-height: 100vh; /* Minimum viewport height but allow content to determine actual height */
     padding: 20px 200px 20px 200px;
     display: flex;
     flex-direction: column;
@@ -169,7 +168,7 @@ body {
     align-items: center; /* Vertically center all elements */
     margin-bottom: 40px; /* Space below progress bar */
     width: 100%; /* Full width to match form sections */
-    justify-content: space-between; /* Distribute steps evenly */
+    position: relative; /* Enable absolute positioning for steps */
 }
 
 /* Reduce progress bar spacing on setup page */
@@ -182,6 +181,20 @@ body {
     display: flex; /* Horizontal layout for number and text */
     align-items: center; /* Vertically center content */
     color: #666; /* Medium gray text */
+        position: absolute; /* Enable precise positioning */
+}
+
+/* Step positioning to align with form sections */
+.step:nth-child(1) {
+    left: 0; /* Align step 1 with left edge (first section) */
+}
+
+.step:nth-child(3) {
+    left: calc(66.67% - 15px); /* Align step 2 with start of third section (additional info) */
+}
+
+.step:nth-child(5) {
+    right: 0; /* Align checkmark with right edge */
 }
 
 /* Circular step number indicators */
@@ -218,10 +231,22 @@ body {
 
 /* Lines connecting the step circles */
 .step-line {
-    flex: 1; /* Take up available space between steps */
+    position: absolute;
     height: 2px; /* Thin line */
-    background-color: #1961AB; /* Gray color */
-    margin: 0 20px; /* Horizontal margins for spacing */
+    background-color: #1961AB; /* Blue color to match steps */
+    top: 50%; /* Center vertically */
+    transform: translateY(-50%); /* Adjust for line thickness */
+}
+
+/* Position the connecting lines */
+.step-line:nth-child(2) {
+    left: 30px; /* Start after first step circle */
+    width: calc(66.67% - 15px - 30px); /* Connect to second step */
+}
+
+.step-line:nth-child(4) {
+    left: calc(66.67% - 15px + 30px); /* Start after second step circle */
+    right: 30px; /* End before checkmark */
 }
 
 /* Special positioning for the last step (checkmark) */

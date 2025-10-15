@@ -54,32 +54,13 @@
     <!-- Main content container -->
     <div class="circulatoir-settings-container">
         
-        <!-- Monitoring Level Controls -->
-        <div class="monitoring-controls-layout">
-            <!-- Monitoring buttons - now direct children -->
-            <div class="monitoring-buttons-direct">
-                <h3 class="info-title">Alarm Level</h3>
-                <div class="button-group">
-                    <button class="btn risk-low" data-level="loose" onclick="changeMonitoringLevel('loose')">Los</button>
-                    <button class="btn risk-med selected" data-level="mid" onclick="changeMonitoringLevel('mid')">Mid</button>
-                    <button class="btn risk-high" data-level="tight" onclick="changeMonitoringLevel('tight')">Strak</button>
-                </div>
-            </div>
-            
-            <!-- Heart circle - now direct child -->
-            <div class="heart-circle-direct">
-                <h3 class="info-title"> </h3>
-                <div id="respiratory-heart-circle-container"></div>
-            </div>
+
             
             <!-- Additional Circulatory Information Container -->
             <div class="additional-circulatory-info">
                 <h3 class="info-title">Overige additionele informatie:</h3>
                 <div class="circulatory-tags-section">
                 <!-- Temperature monitoring tags could go here in the future -->
-                    <button class="btn tag-btn circulatory-tag" data-condition="pneumonie">
-                        Pneumonie <img src="svg's/lung.svg" alt="Pneumonie" class="condition-icon">
-                    </button>
                     <button class="btn tag-btn" data-condition="herstellende">
                         Herstellende <img src="svg's/patient_icon.svg" alt="Herstellende" class="condition-icon">
                     </button>
@@ -90,7 +71,7 @@
         
         
         <!-- Section title moved outside the container -->
-        <h2 class="section-title">Overige Streefgebieden Aanpassen</h2>
+        <h2 class="section-title">Overige Grenzen Aanpassen</h2>
         
         <!-- Interactive Slider Demo Section -->
         <div class="slider-demo-section">
@@ -99,21 +80,6 @@
             <div class="sliders-layout">
                 <div class="temp-slider-with-legend">
                     <div id="temp-slider-container" class="individual-slider"></div>
-                    <div class="alarm-legend">
-                        <div class="legend-item">
-                            <div class="legend-color green"></div>
-                            <span>Acceptabel</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color yellow"></div>
-                            <span>Lichte overschrijding</span>
-                        </div>
-                        
-                        <div class="legend-item">
-                            <div class="legend-color red"></div>
-                            <span>Significante overschrijding</span>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -304,11 +270,12 @@
             margin: 0 !important;
         }
         
-        /* Additional Circulatory Information Container - matches alarm overview form-section */
+        /* Additional Other Information Container - matches alarm overview form-section */
         .additional-circulatory-info {
-            flex: 1.05; /* Further reduced for better proportions */
+            width: 400px; /* Set fixed width instead of flex to prevent full-page expansion */
             display: flex;
             flex-direction: column;
+            margin-bottom: 40px; /* Add spacing between this section and sliders */
         }
         
         .circulatory-tags-section {

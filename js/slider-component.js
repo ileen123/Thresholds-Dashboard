@@ -176,27 +176,17 @@ class VitalParameterSlider {
     }
 
     createEmbeddedSVG(svg, width, height) {
-        // Clear existing filled areas
+        // Clear existing filled areas - for prototype, we don't need the tight/mid/loose visualization
         const upperAreas = svg.querySelector('.upper-areas');
         const lowerAreas = svg.querySelector('.lower-areas');
         upperAreas.innerHTML = '';
         lowerAreas.innerHTML = '';
         
-        // Create the SVG elements for upper areas (from Tight.svg)
-        const upperSvgElements = [
-            { type: 'rect', attrs: { width: '100%', height: '100%', fill: '#ECEC3E' } },
-            { type: 'path', attrs: { d: 'M437 6.32426V131C355.986 117.7 142.332 93.6902 120.777 103.379C99.2214 113.068 78.3022 106.649 57.1498 70.4704L19 0L437 6.32426Z', fill: '#F0973E' } },
-            { type: 'path', attrs: { d: 'M437 0.5V73C361.607 65.5886 162.776 52.209 142.716 57.6082C122.656 63.0074 103.188 59.4301 83.503 39.2698L48 0.5H437Z', fill: '#EB4921' } },
-            { type: 'path', attrs: { d: 'M437 150.927V155H218.625H0.250488L0 0H4.5L12.7647 46.6505C15.5591 69.3794 31.7151 98.5862 45.2979 119.767C54.8349 126.31 63.7986 137.655 64.8242 147.802C65.8498 157.949 437 150.927 437 150.927Z', fill: '#00C877' } }
-        ];
+        // PROTOTYPE: Skip creating the colored area visualizations since SVG files were deleted
+        console.log('Prototype mode: Skipping tight/mid/loose visualization areas');
         
-        // Create the SVG elements for lower areas (from Tight_down.svg)
-        const lowerSvgElements = [
-            { type: 'rect', attrs: { width: '100%', height: '100%', fill: '#ECEC3E' } },
-            { type: 'path', attrs: { d: 'M437 148.676V24C355.986 37.3 142.332 61.3098 120.777 51.6209C99.2214 41.9319 78.3022 48.3515 57.1498 84.5296L19 155L437 148.676Z', fill: '#F0973E' } },
-            { type: 'path', attrs: { d: 'M437 154.5V82C361.607 89.4114 162.776 102.791 142.716 97.3918C122.656 91.9926 103.188 95.5699 83.503 115.73L48 154.5H437Z', fill: '#EB4921' } },
-            { type: 'path', attrs: { d: 'M437 4.07329V0H218.625H0.250488L0 155H4.5L12.7647 108.35C15.5591 85.6206 31.7151 56.4138 45.2979 35.2325C54.8349 28.6905 63.7986 17.3452 64.8242 7.19804C65.8498 -2.94916 437 4.07329 437 4.07329Z', fill: '#00C877' } }
-        ];
+        // Don't create any visual elements - just keep the sliders functional
+        return;
         
         // Add elements to upper areas
         upperSvgElements.forEach(elem => {
@@ -233,149 +223,9 @@ class VitalParameterSlider {
         upperAreas.innerHTML = '';
         lowerAreas.innerHTML = '';
         
-        // Try to load parameter-specific external SVGs first
-        this.loadParameterSpecificSVG(svg, level, upperAreas, lowerAreas);
-    }
-
-    setAppropriateViewBox(svg, upperLoaded, lowerLoaded) {
-        if (!svg) return;
-        
-        // For parameters with 400px wide external SVGs, adjust viewBox
-        if ((this.config.parameter === 'Saturatie' && lowerLoaded) || 
-            (this.config.parameter === 'AF' && upperLoaded) ||
-            (this.config.parameter === 'Temperature' && upperLoaded) ||
-            (this.config.parameter === 'BP_Mean' && lowerLoaded)) {
-            console.log(`📐 Setting viewBox for ${this.config.parameter} external SVG (400px): 0 0 400 270`);
-            svg.setAttribute('viewBox', '0 0 400 270');
-        } else {
-            // Use standard viewBox for other parameters or embedded SVGs
-            console.log(`📐 Setting standard viewBox (437px): 0 0 437 270`);
-            svg.setAttribute('viewBox', '0 0 437 270');
-        }
-        svg.setAttribute('preserveAspectRatio', 'none');
-        
-        // Position the SVGs immediately after viewBox is set
-        this.updateGraphPosition();
-    }
-
-    async loadParameterSpecificSVG(svg, level, upperAreas, lowerAreas) {
-        try {
-            // Define which parameters have external SVGs available
-            const externalSvgConfig = {
-                HR: {
-                    upper: true,  // HR has external upper SVGs
-                    lower: false  // HR uses embedded lower SVGs (for now)
-                },
-                BP_Mean: {
-                    upper: false, // BP uses embedded upper SVGs (for now)
-                    lower: true   // BP has external lower SVGs (BP-tight-down.svg, etc.)
-                },
-                Saturatie: {
-                    upper: false, // Saturatie uses embedded upper SVGs (for now)
-                    lower: true   // Saturatie has external lower SVGs (Sat-tight-down.svg, etc.)
-                },
-                AF: {
-                    upper: true,  // AF has external upper SVGs (AF-tight.svg, etc.)
-                    lower: false  // AF uses embedded lower SVGs (for now)
-                },
-                Temperature: {
-                    upper: true,  // Temperature has external upper SVGs (Temp-tight.svg, etc.)
-                    lower: false  // Temperature uses embedded lower SVGs (for now)
-                }
-            };
-
-            const paramConfig = externalSvgConfig[this.config.parameter];
-            let upperLoaded = false;
-            let lowerLoaded = false;
-
-            // Load external upper SVG if available
-            if (paramConfig && paramConfig.upper) {
-                upperLoaded = await this.loadExternalSVGArea(upperAreas, 'upper', level);
-            }
-
-            // Load external lower SVG if available
-            if (paramConfig && paramConfig.lower) {
-                lowerLoaded = await this.loadExternalSVGArea(lowerAreas, 'lower', level);
-            }
-
-            // Call embedded fallback if no external SVGs were loaded
-            if (!upperLoaded && !lowerLoaded) {
-                this.loadEmbeddedSVGFallback(upperAreas, lowerAreas, level, false, false);
-            } else {
-                // If we have mixed external/embedded, call fallback to fill in missing pieces
-                this.loadEmbeddedSVGFallback(upperAreas, lowerAreas, level, upperLoaded, lowerLoaded);
-            }
-            
-            // Set appropriate viewBox based on which external SVGs were loaded
-            this.setAppropriateViewBox(svg, upperLoaded, lowerLoaded);
-
-        } catch (error) {
-            console.warn(`Error loading external SVGs for ${this.config.parameter}:`, error);
-            // Fallback to embedded SVGs
-            this.loadEmbeddedSVGFallback(upperAreas, lowerAreas, level, false, false);
-        }
-    }
-
-    async loadExternalSVGArea(targetArea, areaType, level) {
-        try {
-            // Construct filename based on parameter type
-            let filename;
-            if (this.config.parameter === 'Saturatie' && areaType === 'lower') {
-                // Saturation lower SVGs: Sat-tight-down.svg, Sat-mid-down.svg, Sat-loose-down.svg
-                filename = `Sat-${level.toLowerCase()}-down.svg`;
-            } else if (this.config.parameter === 'AF' && areaType === 'upper') {
-                // AF upper SVGs: AF-tight.svg, AF-mid.svg, AF-loose.svg
-                filename = `AF-${level.toLowerCase()}.svg`;
-            } else if (this.config.parameter === 'Temperature' && areaType === 'upper') {
-                // Temperature upper SVGs: Temp-tight.svg, Temp-mid.svg, Temp-loose.svg
-                filename = `Temp-${level.toLowerCase()}.svg`;
-            } else if (this.config.parameter === 'BP_Mean' && areaType === 'lower') {
-                // BP lower SVGs: BP-tight-down.svg, BP-mid-down.svg, BP-loose-down.svg
-                filename = `BP-${level.toLowerCase()}-down.svg`;
-            } else {
-                // Standard format: HR-tight, HR-mid, HR-loose for upper
-                // Future: HR-tight-down, HR-mid-down, HR-loose-down for lower
-                const suffix = areaType === 'lower' ? '-down' : '';
-                filename = `${this.config.parameter}-${level.toLowerCase()}${suffix}.svg`;
-            }
-            const svgPath = `./svg's/${filename}`;
-            
-            console.log(`Loading external SVG: ${svgPath} for ${this.config.parameter} ${areaType}`);
-
-            const response = await fetch(svgPath);
-            if (!response.ok) {
-                console.log(`External SVG not found: ${svgPath}, using embedded fallback`);
-                return false;
-            }
-
-            const svgText = await response.text();
-            const parser = new DOMParser();
-            const svgDoc = parser.parseFromString(svgText, 'image/svg+xml');
-            const svgElement = svgDoc.querySelector('svg');
-
-            if (svgElement) {
-                // Copy all child elements from external SVG to target area
-                while (svgElement.firstChild) {
-                    const child = svgElement.firstChild;
-                    targetArea.appendChild(child);
-                }
-                
-                // Don't apply scaling here - let the parent SVG's viewBox handle it
-                console.log(`✅ Successfully loaded external ${areaType} SVG for ${this.config.parameter}`);
-                return true;
-            } else {
-                console.warn(`Invalid SVG content in ${svgPath}`);
-                return false;
-            }
-
-        } catch (error) {
-            console.warn(`Failed to load external SVG for ${this.config.parameter} ${areaType}:`, error);
-            return false;
-        }
-    }
-
-    loadEmbeddedSVGFallback(upperAreas, lowerAreas, level, upperLoaded, lowerLoaded) {
-        const svg = upperAreas.closest('svg');
+        // PROTOTYPE: Skip creating the colored area visualizations since SVG files were deleted
+        console.log(`Prototype mode: Skipping ${level} visualization areas`);
+        return;
         
         // Define correct SVG content for each monitoring level (copied from actual SVG files)
         const svgDefinitions = {
@@ -423,54 +273,35 @@ class VitalParameterSlider {
             }
         };
         
-        let levelData = svgDefinitions[level.toLowerCase()];
+        const levelData = svgDefinitions[level.toLowerCase()];
         if (!levelData) {
             console.warn(`Unknown monitoring level: ${level}, using tight as fallback`);
             levelData = svgDefinitions.tight;
         }
         
-        // Only create upper areas if not already loaded externally
-        if (!upperLoaded) {
-            levelData.upper.forEach(elementData => {
-                const element = document.createElementNS('http://www.w3.org/2000/svg', elementData.type);
-                Object.entries(elementData.attrs).forEach(([key, value]) => {
-                    element.setAttribute(key, value);
-                });
-                upperAreas.appendChild(element);
+        // Create upper areas
+        levelData.upper.forEach(elementData => {
+            const element = document.createElementNS('http://www.w3.org/2000/svg', elementData.type);
+            Object.entries(elementData.attrs).forEach(([key, value]) => {
+                element.setAttribute(key, value);
             });
-            console.log(`📄 Created embedded upper SVG for ${level} level`);
-        } else {
-            console.log(`⚡ Skipped upper SVG creation - external SVG already loaded for ${level}`);
-        }
+            upperAreas.appendChild(element);
+        });
         
-        // Only create lower areas if not already loaded externally
-        if (!lowerLoaded) {
-            levelData.lower.forEach(elementData => {
-                const element = document.createElementNS('http://www.w3.org/2000/svg', elementData.type);
-                Object.entries(elementData.attrs).forEach(([key, value]) => {
-                    element.setAttribute(key, value);
-                });
-                lowerAreas.appendChild(element);
+        // Create lower areas
+        levelData.lower.forEach(elementData => {
+            const element = document.createElementNS('http://www.w3.org/2000/svg', elementData.type);
+            Object.entries(elementData.attrs).forEach(([key, value]) => {
+                element.setAttribute(key, value);
             });
-            console.log(`📄 Created embedded lower SVG for ${level} level`);
-        } else {
-            console.log(`⚡ Skipped lower SVG creation - external SVG already loaded for ${level}`);
-        }
+            lowerAreas.appendChild(element);
+        });
         
-        // Set the viewBox to match the original SVG - this will automatically scale content
-        if (svg) {
-            // For Saturation external SVGs that are 400px wide, we need to adjust the viewBox
-            if (this.config.parameter === 'Saturatie' && lowerLoaded) {
-                // Use a viewBox that matches the external SVG dimensions (400px wide)
-                svg.setAttribute('viewBox', '0 0 400 270');
-            } else {
-                // Use standard viewBox for other parameters
-                svg.setAttribute('viewBox', '0 0 437 270');
-            }
-            svg.setAttribute('preserveAspectRatio', 'none');
-        }
+        // Set the viewBox to match the original SVG
+        svg.setAttribute('viewBox', '0 0 437 270');
+        svg.setAttribute('preserveAspectRatio', 'none');
         
-        console.log(`✅ SVG fallback completed for ${level} level (upper: ${upperLoaded ? 'external' : 'embedded'}, lower: ${lowerLoaded ? 'external' : 'embedded'})`);
+        console.log(`Embedded SVG created for ${level} level with correct original content`);
         
         // Position the SVGs immediately after creation
         this.updateGraphPosition();
@@ -558,41 +389,16 @@ class VitalParameterSlider {
         // Move upper-areas group: position so the bottom of the SVG (green area) aligns with the upper dashed line
         const upperAreas = svg.querySelector('.upper-areas');
         if (upperAreas && upperAreas.firstChild) {
-            // Check if we're using external SVGs for upper areas
-            const isExternalUpperSVG = (this.config.parameter === 'HR') || (this.config.parameter === 'AF') || (this.config.parameter === 'Temperature');
-            
-            if (isExternalUpperSVG) {
-                // External SVGs: HR has height 286, AF has height 262, Temperature has height 260
-                // Position so bottom aligns with upper dashed line, add 1 extra pixel for perfect alignment without gaps
-                let svgHeight;
-                if (this.config.parameter === 'HR') {
-                    svgHeight = 286;
-                } else if (this.config.parameter === 'AF') {
-                    svgHeight = 262;
-                } else if (this.config.parameter === 'Temperature') {
-                    svgHeight = 260;
-                }
-                upperAreas.setAttribute('transform', `translate(0,${upperPos - svgHeight - 1})`);
-            } else {
-                // Embedded SVGs have height 155, position with slight adjustment to eliminate gap
-                // Subtract 1 extra pixel to ensure perfect alignment
-                upperAreas.setAttribute('transform', `translate(0,${upperPos - 155 - 1})`);
-            }
+            // Position the SVG so its bottom edge touches the upper dashed line
+            // The SVG extends upward from this line and gets clipped by the chart boundaries
+            upperAreas.setAttribute('transform', `translate(0,${upperPos - 155})`);
         }
         
         // Move lower-areas group: attach the TOP of the SVG to the lower dashed line (so it extends downward)
         const lowerAreas = svg.querySelector('.lower-areas');
         if (lowerAreas && lowerAreas.firstChild) {
-            // Check if we're using external SVGs for lower areas (Saturatie and BP_Mean parameters)
-            const isExternalLowerSVG = this.config.parameter === 'Saturatie' || this.config.parameter === 'BP_Mean';
-            
-            if (isExternalLowerSVG) {
-                // External lower SVGs (Saturatie, BP): scale and position appropriately
-                lowerAreas.setAttribute('transform', `translate(0,${lowerPos})`);
-            } else {
-                // Embedded SVGs: use original positioning
-                lowerAreas.setAttribute('transform', `translate(0,${lowerPos})`);
-            }
+            // Attach the top edge of the SVG to the lower dashed line
+            lowerAreas.setAttribute('transform', `translate(0,${lowerPos})`);
         }
         
         // Both areas are clipped by the chart-frame, so they extend outward from their respective dashed lines
