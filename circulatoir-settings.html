@@ -84,16 +84,12 @@
         </div>
     </div>
 
-    <!-- Navigation section with back button -->
-    <div class="bottom-left-nav">
-        <button class="nav-button back-button" onclick="goBackToAlarmOverview()">
+    <!-- Navigation section -->
+    <div class="navigation">
+        <button class="nav-btn" onclick="goBackToAlarmOverview()">
             ← Terug naar Alarm Overzicht
         </button>
-    </div>
-
-    <!-- Bottom right navigation button -->
-    <div class="bottom-right-nav">
-        <button class="nav-button forward-button" onclick="goToRespiratoir()">
+        <button class="nav-btn" onclick="goToRespiratoir()">
             Naar Respiratoir →
         </button>
     </div>
@@ -1049,7 +1045,6 @@
             initializePage();
             setupEventListeners();
             initializeSepsisTagState(); // Initialize sepsis state FIRST
-            initializePneumonieTagState(); // Initialize pneumonie state
             
             // Initialize global variables system (simple approach)
             if (window.sharedDataManager) {
@@ -1057,12 +1052,17 @@
                 console.log('✅ Global variables loaded for circulatoir page');
             }
 
-            // Initialize button states immediately after DOM is ready
-            initializeMonitoringLevelButtons();
-
-            // Initialize heart circle component (same as alarm overview)
+            // Initialize components independently
             setTimeout(() => {
-                initializeHeartCircleComponent();
+                // Try to initialize heart circle if container exists
+                const heartContainer = document.getElementById('circulatoir-heart-circle-container');
+                if (heartContainer) {
+                    initializeHeartCircleComponent();
+                } else {
+                    console.log('ℹ️ Heart circle container not found - skipping heart circle initialization');
+                }
+                
+                // Always initialize sliders regardless of heart circle
                 initializeSliders();
             }, 1000);
         });
@@ -1094,29 +1094,33 @@
 
         // Initialize the heart circle component in circulatoir settings
         function initializeHeartCircleComponent() {
-            console.log('🫀 Starting initializeHeartCircleComponent...');
+            // Check if container exists first
+            const heartContainer = document.getElementById('circulatoir-heart-circle-container');
+            if (!heartContainer) {
+                console.log('ℹ️ Heart circle container not found - heart circle component will not be initialized');
+                return;
+            }
             
             // Use same size as alarm overview
             const circleSize = 130;
             
-            // Get EFFECTIVE monitoring level from SharedDataManager (including tag adjustments)
+            // Get current monitoring level from SharedDataManager
             let initialLevel = 'mid';
             if (currentPatientId && window.sharedDataManager) {
-                initialLevel = window.sharedDataManager.getEffectiveHeartMonitoringLevel(currentPatientId);
-                console.log(`🫀 Heart circle initialization - Loading EFFECTIVE heart monitoring level for patient ${currentPatientId}:`, initialLevel);
-            } else {
-                console.log('🫀 Heart circle initialization - Using default level (mid) - no patient ID or SharedDataManager');
-                console.log('🫀 Current patient ID:', currentPatientId);
-                console.log('🫀 SharedDataManager available:', !!window.sharedDataManager);
+                initialLevel = window.sharedDataManager.getHeartMonitoringLevel(currentPatientId);
+                console.log(`Loading heart monitoring level for patient ${currentPatientId}:`, initialLevel);
             }
             
-            console.log(`🫀 Creating heart circle component with initialState: ${initialLevel}`);
-            
-            window.circulatoirHeartCircle = new HeartCircleComponent('circulatoir-heart-circle-container', { 
-                size: circleSize, 
-                initialState: initialLevel 
-            });
-            setTimeout(() => injectSVG('circulatoir-heart-circle-container', 'heart'), 100);
+            try {
+                window.circulatoirHeartCircle = new HeartCircleComponent('circulatoir-heart-circle-container', { 
+                    size: circleSize, 
+                    initialState: initialLevel 
+                });
+                setTimeout(() => injectSVG('circulatoir-heart-circle-container', 'heart'), 100);
+            } catch (error) {
+                console.error('❌ Failed to initialize heart circle component:', error);
+                return;
+            }
             
             // Map heart circle levels to button levels for initial setup
             const levelMapping = {
@@ -1165,17 +1169,22 @@
             const mappedLevel = levelMapping[level] || level;
             console.log(`Updating button states: ${level} → ${mappedLevel}`);
             
-            // Update button states
-            document.querySelectorAll('.button-group .btn').forEach(btn => {
-                btn.classList.remove('active', 'selected');
-            });
-            
-            const selectedButton = document.querySelector(`[data-level="${mappedLevel}"]`);
-            if (selectedButton) {
-                selectedButton.classList.add('selected');
-                console.log(`✅ Button ${mappedLevel} selected in updateButtonStates`);
+            // Update button states only if buttons exist
+            const buttons = document.querySelectorAll('.button-group .btn');
+            if (buttons.length > 0) {
+                buttons.forEach(btn => {
+                    btn.classList.remove('active', 'selected');
+                });
+                
+                const selectedButton = document.querySelector(`[data-level="${mappedLevel}"]`);
+                if (selectedButton) {
+                    selectedButton.classList.add('selected');
+                    console.log(`✅ Button ${mappedLevel} selected in updateButtonStates`);
+                } else {
+                    console.warn(`❌ Button with data-level="${mappedLevel}" not found`);
+                }
             } else {
-                console.warn(`❌ Button with data-level="${mappedLevel}" not found`);
+                console.log(`ℹ️ No monitoring level buttons found - skipping button state update`);
             }
         }
 
