@@ -49,6 +49,10 @@
         }
     </style>
     
+    <!-- WebSocket Communication Scripts -->
+    <script src="js/websocket-outbound-client.js"></script>
+    <script src="js/websocket-connection-manager.js"></script>
+    
     <!-- Data Manager for cross-page data synchronization -->
     <script src="js/shared-data-manager.js"></script>
 </head>
@@ -596,43 +600,7 @@
                         }
                         
                         function setupEventListeners() {
-                            // Set up problem dropdown listener
-                            const problemDropdown = document.getElementById('problemDropdown');
-                            if (problemDropdown) {
-                                problemDropdown.addEventListener('change', function() {
-                                    console.log('🎯 USER manually changed main problem dropdown');
-                                    // Set flag that user is manually changing problem (should overwrite manual adjustments)
-                                    if (window.sharedDataManager) {
-                                        window.sharedDataManager.setUserChangingProblem(true);
-                                    }
-                                    
-                                    selectedProblem = this.value;
-                                    window.dataManager?.setSelectedProblem(selectedProblem);
-                                    
-                                    // IMMEDIATE SAVE: Save problem selection to SharedDataManager immediately
-                                    // so that tag clicks can access the current problem/risk context
-                                    if (currentPatientId && window.sharedDataManager) {
-                                        const existingMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
-                                        const updatedMedicalInfo = {
-                                            ...existingMedicalInfo,
-                                            selectedProblem: selectedProblem,
-                                            selectedRiskLevel: selectedRiskLevel,
-                                            selectedTags: selectedTags,
-                                            lastUpdated: new Date().toISOString()
-                                        };
-                                        window.sharedDataManager.savePatientMedicalInfo(currentPatientId, updatedMedicalInfo);
-                                        console.log('💾 Immediately saved problem selection to SharedDataManager:', selectedProblem);
-                                    }
-                                    
-                                    updateOrganCirclesBasedOnProblem(selectedProblem);
-                                    updateProgressBar(); // Update progress when problem is selected
-                                    
-                                    // Clear flag after processing
-                                    if (window.sharedDataManager) {
-                                        setTimeout(() => window.sharedDataManager.setUserChangingProblem(false), 100);
-                                    }
-                                });
-                            }
+                            // Note: Medical diagnosis dropdown uses custom selectOption() function, not event listeners
                             
                             // Set up risk level button listeners
                             const riskButtons = document.querySelectorAll('.btn.risk-low, .btn.risk-mid, .btn.risk-high');
@@ -667,24 +635,9 @@
                                     console.log('🔵 selectedRiskLevel is now:', selectedRiskLevel);
                                     window.dataManager?.setSelectedRiskLevel(riskLevel);
                                     
-                                    // IMMEDIATE SAVE: Save risk level selection to SharedDataManager immediately
-                                    // so that tag clicks can access the current problem/risk context
+                                    // MANUAL OVERRIDE CLEARING: Clear any manual overrides (fragile system)
                                     if (currentPatientId && window.sharedDataManager) {
-                                        const existingMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
-                                        const updatedMedicalInfo = {
-                                            ...existingMedicalInfo,
-                                            selectedProblem: selectedProblem,
-                                            selectedRiskLevel: selectedRiskLevel,
-                                            selectedTags: selectedTags,
-                                            lastUpdated: new Date().toISOString()
-                                        };
-                                        window.sharedDataManager.savePatientMedicalInfo(currentPatientId, updatedMedicalInfo);
-                                        console.log('💾 Immediately saved risk level selection to SharedDataManager:', selectedRiskLevel);
-                                        
-                                        // NEW: Apply intelligent highlighting for risk level changes
-                                        if (oldRiskLevel && oldRiskLevel !== riskLevel && selectedProblem) {
-                                            console.log('📊 Risk level changed - no highlighting needed');
-                                        }
+                                        window.sharedDataManager.clearManualOverrides(currentPatientId, `setup-risk-level-${riskLevel}`);
                                     }
                                     
                                     updateOrganCirclesWithRisk(riskLevel);
@@ -707,6 +660,22 @@
                                         
                                         console.log('✅ Recalculated monitoring levels with tags:', result.organStates);
                                         console.log('📋 Medical reasoning:', result.reasoning);
+                                        
+                                        // TIMING FIX: Save risk level change AFTER organ levels are recalculated
+                                        // This ensures WebSocket contains current organ states
+                                        const currentMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
+                                        currentMedicalInfo.selectedRiskLevel = riskLevel;
+                                        currentMedicalInfo.selectedProblem = selectedProblem;
+                                        currentMedicalInfo.selectedTags = selectedTags;
+                                        currentMedicalInfo.lastUpdated = new Date().toISOString();
+                                        window.sharedDataManager.savePatientMedicalInfo(currentPatientId, currentMedicalInfo);
+                                        console.log('✅ TIMING FIX: Risk level saved AFTER organ calculations - triggers WebSocket with current data:', riskLevel);
+                                        
+                                        // DEBUG: Check what applyProblemSpecificMonitoring actually stored
+                                        console.log('🔍 IMMEDIATE Debug - Organ levels right after applyProblemSpecificMonitoring:');
+                                        console.log('  Heart:', window.sharedDataManager.getHeartMonitoringLevel(currentPatientId));
+                                        console.log('  Lung:', window.sharedDataManager.getLungMonitoringLevel(currentPatientId));
+                                        console.log('  Temp:', window.sharedDataManager.getTempMonitoringLevel(currentPatientId));
                                         
                                         // Update monitoring status labels immediately
                                         setTimeout(() => updateMonitoringStatus(), 150);
@@ -787,10 +756,69 @@
                                     
                                     window.dataManager?.setSelectedTags(selectedTags);
                                     
+                                    // WEBSOCKET FIX: Trigger websocket for non-sepsis/pneumonie tag changes
+                                    // sepsis and pneumonie already trigger via toggleConditionTag, other tags need manual trigger
+                                    if (currentPatientId && window.sharedDataManager && tagCondition !== 'sepsis' && tagCondition !== 'pneumonie') {
+                                        // Small delay to ensure tag state changes are applied
+                                        setTimeout(() => {
+                                            const currentMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
+                                            currentMedicalInfo.selectedTags = selectedTags;
+                                            currentMedicalInfo.lastUpdated = new Date().toISOString();
+                                            window.sharedDataManager.savePatientMedicalInfo(currentPatientId, currentMedicalInfo);
+                                            console.log('📤 WEBSOCKET FIX: Non-matrix tag change triggered websocket for:', tagCondition, this.classList.contains('selected') ? 'SELECTED' : 'DESELECTED');
+                                        }, 100);
+                                    }
+                                    
                                     // Apply parameter range updates for non-matrix tags
                                     if (tagCondition !== 'sepsis' && tagCondition !== 'pneumonie') {
                                         console.log('🔄 Updating parameter ranges for condition:', tagCondition);
                                         updateParameterRanges();
+                                    }
+                                    
+                                    // BACKUP TIMEOUT: Ensure UI updates for unified tag system (sepsis/pneumonie)
+                                    if (tagCondition === 'sepsis' || tagCondition === 'pneumonie') {
+                                        setTimeout(() => {
+                                            console.log(`🔄 BACKUP (SETUP): Forcing UI refresh after ${tagCondition} ${this.classList.contains('selected') ? 'selection' : 'deselection'}...`);
+                                            syncDisplaysWithCentralizedRanges();
+                                            updateSetupPageElements(); // Update setup page UI elements too
+                                            
+                                            // Update organ circles if available
+                                            if (window.organComponents) {
+                                                console.log('🔄 BACKUP (SETUP): Updating organ circles...');
+                                                
+                                                // Get current organ monitoring levels
+                                                if (currentPatientId && window.sharedDataManager) {
+                                                    const effectiveValues = window.sharedDataManager.getCurrentEffectiveValues(currentPatientId);
+                                                    if (effectiveValues && effectiveValues.monitoringLevels) {
+                                                        const { heart, lung, temp } = effectiveValues.monitoringLevels;
+                                                        
+                                                        if (heart && window.organComponents.heart) {
+                                                            window.organComponents.heart.setRiskLevel(heart);
+                                                            console.log(`✅ BACKUP (SETUP): Updated heart circle to: ${heart}`);
+                                                        }
+                                                        
+                                                        if (lung && window.organComponents.lung) {
+                                                            window.organComponents.lung.setRiskLevel(lung);
+                                                            console.log(`✅ BACKUP (SETUP): Updated lung circle to: ${lung}`);
+                                                        }
+                                                        
+                                                        if (temp && window.organComponents.temp) {
+                                                            window.organComponents.temp.setRiskLevel(temp);
+                                                            console.log(`✅ BACKUP (SETUP): Updated temp circle to: ${temp}`);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            
+                                            // Additional backup after more time to ensure all async operations complete
+                                            setTimeout(() => {
+                                                console.log(`🔄 SECONDARY BACKUP (SETUP): Final UI refresh for ${tagCondition}...`);
+                                                syncDisplaysWithCentralizedRanges();
+                                                updateSetupPageElements();
+                                                // Update monitoring status labels as final backup
+                                                updateMonitoringStatus();
+                                            }, 100);
+                                        }, 150); // Increased from 50ms to 150ms
                                     }
                                 });
                             });
@@ -872,6 +900,113 @@
                                     console.log('📊 TAG PARAMETER SYNC COMPLETED on setup page');
                                 } else {
                                     console.log(`⏸️ Ignoring tag change - patient mismatch (${patientId} vs ${currentPatientId})`);
+                                }
+                            });
+
+                            // UNIFIED TAG SYSTEM: Listen for immediate UI updates after tag changes
+                            window.addEventListener('unifiedTagUIUpdateRequired', function(event) {
+                                console.log('🔄 UNIFIED TAG (SETUP): Immediate UI update required:', event.detail);
+                                
+                                const { patientId, activeTags, targetRanges, organStates } = event.detail;
+                                
+                                // Only update if it's for the current patient
+                                if (patientId === currentPatientId) {
+                                    console.log('🏷️ UNIFIED TAG (SETUP): Applying immediate UI updates...');
+                                    console.log('   - Active tags:', activeTags);
+                                    console.log('   - Target ranges:', targetRanges);
+                                    console.log('   - Organ states:', organStates);
+                                    
+                                    // Refresh displays with new target ranges
+                                    if (targetRanges) {
+                                        console.log('🔄 UNIFIED TAG (SETUP): Syncing displays with new target ranges...');
+                                        syncDisplaysWithCentralizedRanges();
+                                    }
+                                    
+                                    // Update organ circle components
+                                    if (organStates && window.organComponents) {
+                                        console.log(`🔄 UNIFIED TAG (SETUP): Updating organ states:`, organStates);
+                                        
+                                        if (organStates.heart && window.organComponents.heart) {
+                                            window.organComponents.heart.setRiskLevel(organStates.heart);
+                                            console.log(`✅ Updated heart circle to: ${organStates.heart}`);
+                                        }
+                                        
+                                        if (organStates.lung && window.organComponents.lung) {
+                                            window.organComponents.lung.setRiskLevel(organStates.lung);
+                                            console.log(`✅ Updated lung circle to: ${organStates.lung}`);
+                                        }
+                                        
+                                        if (organStates.temp && window.organComponents.temp) {
+                                            window.organComponents.temp.setRiskLevel(organStates.temp);
+                                            console.log(`✅ Updated temp circle to: ${organStates.temp}`);
+                                        }
+                                    }
+                                    
+                                    // Update setup page UI elements
+                                    updateSetupPageElements();
+                                    
+                                    // Update monitoring status labels after organ state changes
+                                    setTimeout(() => updateMonitoringStatus(), 100);
+                                    
+                                    console.log('✅ UNIFIED TAG (SETUP): Immediate UI updates completed');
+                                } else {
+                                    console.log('⏭️ UNIFIED TAG (SETUP): Skipping UI update - different patient');
+                                }
+                            });
+
+                            // UNIFIED TAG SYSTEM: Listen for unified tag state synchronization
+                            window.addEventListener('unifiedTagStateSyncRequired', function(event) {
+                                console.log('🔄 UNIFIED TAG (SETUP): Sync required event received:', event.detail);
+                                
+                                const { patientId, tagStates } = event.detail;
+                                
+                                // Only update if it's for the current patient
+                                if (patientId === currentPatientId) {
+                                    console.log('🏷️ UNIFIED TAG (SETUP): Syncing UI with tag states:', tagStates);
+                                    
+                                    // Update sepsis button
+                                    if (tagStates.hasOwnProperty('sepsis')) {
+                                        const sepsisButton = document.querySelector('.tag-btn[data-condition="sepsis"]');
+                                        if (sepsisButton) {
+                                            if (tagStates.sepsis) {
+                                                sepsisButton.classList.add('selected');
+                                                if (!selectedTags.includes('sepsis')) {
+                                                    selectedTags.push('sepsis');
+                                                }
+                                            } else {
+                                                sepsisButton.classList.remove('selected');
+                                                selectedTags = selectedTags.filter(t => t !== 'sepsis');
+                                            }
+                                            console.log(`🏷️ UNIFIED TAG (SETUP): Synced sepsis to ${tagStates.sepsis ? 'SELECTED' : 'DESELECTED'}`);
+                                        }
+                                    }
+                                    
+                                    // Update pneumonie button
+                                    if (tagStates.hasOwnProperty('pneumonie')) {
+                                        const pneumonieButton = document.querySelector('.tag-btn[data-condition="pneumonie"]');
+                                        if (pneumonieButton) {
+                                            if (tagStates.pneumonie) {
+                                                pneumonieButton.classList.add('selected');
+                                                if (!selectedTags.includes('pneumonie')) {
+                                                    selectedTags.push('pneumonie');
+                                                }
+                                            } else {
+                                                pneumonieButton.classList.remove('selected');
+                                                selectedTags = selectedTags.filter(t => t !== 'pneumonie');
+                                            }
+                                            console.log(`🏷️ UNIFIED TAG (SETUP): Synced pneumonie to ${tagStates.pneumonie ? 'SELECTED' : 'DESELECTED'}`);
+                                        }
+                                    }
+                                    
+                                    // Refresh displays with timeout to ensure data is processed
+                                    setTimeout(() => {
+                                        console.log('🔄 UNIFIED TAG (SETUP): Refreshing displays after tag state sync...');
+                                        syncDisplaysWithCentralizedRanges();
+                                        updateSetupPageElements(); // Update setup page UI elements too
+                                        // Update monitoring status labels after tag state sync
+                                        updateMonitoringStatus();
+                                        console.log('✅ UNIFIED TAG (SETUP): Display refresh completed after sync');
+                                    }, 100);
                                 }
                             });
                         }
@@ -1002,19 +1137,29 @@
                             console.log('Interface reset to fresh state');
                         }
 
-                        // Function to update organ circles based on selected problem
-                        function updateOrganCirclesBasedOnProblem(problemValue) {
-                            console.log('Problem selected:', problemValue);
-                            selectedProblem = problemValue;
-                            updateOrganCircles();
-                        }
-                        
-                        // Function to update organ circles based on risk level
+        // Function to update organ circles based on selected problem
+        function updateOrganCirclesBasedOnProblem(problemValue) {
+            console.log('Problem selected:', problemValue);
+            selectedProblem = problemValue;
+            
+            // MANUAL OVERRIDE CLEARING: Clear any manual overrides (fragile system)
+            if (currentPatientId && window.sharedDataManager) {
+                window.sharedDataManager.clearManualOverrides(currentPatientId, `setup-problem-${problemValue}`);
+            }
+            
+            updateOrganCircles();
+        }                        // Function to update organ circles based on risk level
                         function updateOrganCirclesWithRisk(riskLevel) {
                             console.log('🔄 updateOrganCirclesWithRisk called with:', riskLevel);
                             console.log('🔄 Current selectedProblem:', selectedProblem);
                             console.log('🔄 Setting selectedRiskLevel to:', riskLevel);
                             selectedRiskLevel = riskLevel;
+                            
+                            // MANUAL OVERRIDE CLEARING: Clear any manual overrides when risk level changes
+                            if (currentPatientId && window.sharedDataManager) {
+                                window.sharedDataManager.clearManualOverrides(currentPatientId, `setup-risk-level-${riskLevel}`);
+                            }
+                            
                             console.log('🔄 Calling updateOrganCircles...');
                             updateOrganCircles();
                         }
@@ -1030,33 +1175,87 @@
                                 // For setup page, this is often a new patient setup, so force clean state
                                 window.sharedDataManager.ensureCleanPatientState(currentPatientId, true);
                                 
-                                // Initialize all condition buttons based on stored states
-                                const conditions = ['sepsis', 'pneumonie', 'herstellende'];
-                                
-                                conditions.forEach(condition => {
-                                    const conditionState = window.sharedDataManager.getPatientConditionState(condition, currentPatientId);
-                                    const conditionButton = document.querySelector(`.tag-btn[data-condition="${condition}"]`);
-                                    
-                                    if (conditionButton) {
-                                        // Force deselect all condition buttons for new setup
-                                        conditionButton.classList.remove('selected');
-                                        
-                                        if (conditionState && conditionState.isActive) {
-                                            conditionButton.classList.add('selected');
-                                            if (!selectedTags.includes(condition)) {
-                                                selectedTags.push(condition);
-                                            }
-                                            console.log(`✅ Initialized ${condition} button as selected (setup)`);
-                                        } else {
-                                            console.log(`✅ Initialized ${condition} button as deselected (setup)`);
-                                        }
-                                    }
-                                });
+                                // UNIFIED TAG SYSTEM: Load tag states from SharedDataManager
+                                loadUnifiedTagStates();
                                 
                                 console.log('🔍 Final selectedTags after initialization:', selectedTags);
                                 // Update parameter ranges after initializing condition states
                                 updateParameterRanges();
                             }
+                        }
+
+                        // UNIFIED TAG SYSTEM: Load tag states from SharedDataManager
+                        function loadUnifiedTagStates() {
+                            if (!currentPatientId || !window.sharedDataManager) {
+                                console.log('⏸️ UNIFIED TAG (SETUP): Cannot load tag states - missing dependencies');
+                                return;
+                            }
+                            
+                            console.log('🏷️ UNIFIED TAG (SETUP): Loading tag states for patient:', currentPatientId);
+                            
+                            // Get current tag states from unified system
+                            const tagStates = window.sharedDataManager.getCurrentTagStatesForPatient(currentPatientId);
+                            
+                            // Initialize all condition buttons based on unified tag states
+                            const conditions = ['sepsis', 'pneumonie', 'herstellende'];
+                            
+                            conditions.forEach(condition => {
+                                const conditionButton = document.querySelector(`.tag-btn[data-condition="${condition}"]`);
+                                
+                                if (conditionButton) {
+                                    // Force deselect all condition buttons first
+                                    conditionButton.classList.remove('selected');
+                                    
+                                    // Check unified tag states
+                                    if (tagStates.hasOwnProperty(condition) && tagStates[condition]) {
+                                        conditionButton.classList.add('selected');
+                                        if (!selectedTags.includes(condition)) {
+                                            selectedTags.push(condition);
+                                        }
+                                        console.log(`🏷️ UNIFIED TAG (SETUP): Initialized ${condition} button as SELECTED`);
+                                    } else {
+                                        console.log(`🏷️ UNIFIED TAG (SETUP): Initialized ${condition} button as DESELECTED`);
+                                    }
+                                }
+                            });
+                        }
+
+                        // Function to update setup page UI elements when tags change monitoring levels
+                        function updateSetupPageElements() {
+                            if (!currentPatientId || !window.sharedDataManager) return;
+                            
+                            console.log('🔄 Updating setup page UI elements for monitoring level changes...');
+                            
+                            // Sync displays with current target ranges
+                            syncDisplaysWithCentralizedRanges();
+                            
+                            // Update organ circles with current monitoring levels
+                            if (window.organComponents) {
+                                const effectiveValues = window.sharedDataManager.getCurrentEffectiveValues(currentPatientId);
+                                if (effectiveValues && effectiveValues.monitoringLevels) {
+                                    const { heart, lung, temp } = effectiveValues.monitoringLevels;
+                                    
+                                    if (heart && window.organComponents.heart) {
+                                        window.organComponents.heart.setRiskLevel(heart);
+                                        console.log(`✅ Updated heart circle to reflect monitoring level: ${heart}`);
+                                    }
+                                    
+                                    if (lung && window.organComponents.lung) {
+                                        window.organComponents.lung.setRiskLevel(lung);
+                                        console.log(`✅ Updated lung circle to reflect monitoring level: ${lung}`);
+                                    }
+                                    
+                                    if (temp && window.organComponents.temp) {
+                                        window.organComponents.temp.setRiskLevel(temp);
+                                        console.log(`✅ Updated temp circle to reflect monitoring level: ${temp}`);
+                                    }
+                                }
+                            }
+                            
+                            // Update monitoring status labels to reflect current circle states
+                            updateMonitoringStatus();
+                            
+                            console.log('✅ Setup page UI elements updated');
                         }
 
                         // Main function to update organ circles based on current problem and risk
@@ -1241,25 +1440,42 @@
                         /**
                          * Synchronize all written displays with centralized target ranges
                          * Called on page load to ensure displays match the source of truth
+                         * Uses getCurrentEffectiveValues() instead of global variables for consistency
                          */
                         function syncDisplaysWithCentralizedRanges() {
-                            console.log('🌐 SIMPLE SYNC: Updating displays with global variables...');
+                            console.log('🌐 SINGLE SOURCE: Updating displays with effective values...');
+
+                            if (!currentPatientId || !window.sharedDataManager) {
+                                console.warn('⚠️ Cannot sync displays - missing patient or SharedDataManager');
+                                return;
+                            }
+
+                            // Get effective values (single source of truth)
+                            const effectiveValues = window.sharedDataManager.getCurrentEffectiveValues(currentPatientId);
+                            
+                            if (!effectiveValues || !effectiveValues.parameterRanges) {
+                                console.warn('⚠️ No effective values available for display sync');
+                                return;
+                            }
+
+                            const ranges = effectiveValues.parameterRanges;
+                            console.log('📦 Using effective parameter ranges for display:', ranges);
 
                             // Update circulatory parameters (HR and BP)
                             const circulatoryCard = document.querySelector('.value-card');
                             const hrRange = circulatoryCard?.querySelector('.value-number');
                             const bpRange = circulatoryCard?.querySelectorAll('.value-number')[1];
 
-                            // Update HR display from global variables
-                            if (hrRange) {
-                                hrRange.textContent = `${window.HR_MIN} - ${window.HR_MAX} bpm`;
-                                console.log('📊 Updated HR display:', hrRange.textContent);
+                            // Update HR display from effective values
+                            if (hrRange && ranges.HR) {
+                                hrRange.textContent = `${ranges.HR.min} - ${ranges.HR.max} bpm`;
+                                console.log('📊 Updated HR display from effective values:', hrRange.textContent);
                             }
 
-                            // Update BP display from global variables
-                            if (bpRange) {
-                                bpRange.textContent = `${window.BP_MIN} - ${window.BP_MAX} mmHg`;
-                                console.log('📊 Updated BP display:', bpRange.textContent);
+                            // Update BP display from effective values
+                            if (bpRange && ranges.BP_Mean) {
+                                bpRange.textContent = `${ranges.BP_Mean.min} - ${ranges.BP_Mean.max} mmHg`;
+                                console.log('📊 Updated BP display from effective values:', bpRange.textContent);
                             }
 
                             // Update respiratory parameters
@@ -1269,40 +1485,40 @@
                                 const saturatieRange = respiratoryCard?.querySelector('.value-number');
                                 const afDisplay = document.getElementById('af-range-display');
 
-                                // Update Saturatie display from global variables
-                                if (saturatieRange) {
-                                    saturatieRange.textContent = `${window.SAT_MIN} - ${window.SAT_MAX}%`;
-                                    console.log('📊 Updated Saturatie display:', saturatieRange.textContent);
+                                // Update Saturatie display from effective values
+                                if (saturatieRange && ranges.Saturatie) {
+                                    saturatieRange.textContent = `${ranges.Saturatie.min} - ${ranges.Saturatie.max}%`;
+                                    console.log('📊 Updated Saturatie display from effective values:', saturatieRange.textContent);
                                 }
 
-                                // Update AF display from global variables
-                                if (afDisplay) {
-                                    afDisplay.textContent = `${window.AF_MIN} - ${window.AF_MAX} /min`;
-                                    console.log('📊 Updated AF display:', afDisplay.textContent);
+                                // Update AF display from effective values
+                                if (afDisplay && ranges.AF) {
+                                    afDisplay.textContent = `${ranges.AF.min} - ${ranges.AF.max} /min`;
+                                    console.log('📊 Updated AF display from effective values:', afDisplay.textContent);
                                 }
                             }
 
-                            // Update temperature display from global variables
+                            // Update temperature display from effective values
                             const temperatureCards = document.querySelectorAll('.value-card');
                             if (temperatureCards.length >= 3) {
                                 const temperatureCard = temperatureCards[2];
                                 const tempRange = temperatureCard?.querySelector('.value-number');
 
-                                if (tempRange) {
-                                    tempRange.textContent = `${window.TEMP_MIN} - ${window.TEMP_MAX}°C`;
-                                    console.log('📊 Updated Temperature display:', tempRange.textContent);
+                                if (tempRange && ranges.Temperature) {
+                                    tempRange.textContent = `${ranges.Temperature.min} - ${ranges.Temperature.max}°C`;
+                                    console.log('📊 Updated Temperature display from effective values:', tempRange.textContent);
                                 }
                             }
 
-                            console.log('✅ All displays updated with global variables');
+                            console.log('✅ All displays updated with effective values (single source of truth)');
                         }
                         
                         // Function to check if a parameter is actually affected by a specific tag
                         function isParameterAffectedByTag(parameter, tag) {
                             // Based on the tagMatrix in SharedDataManager, determine which parameters are affected by each tag
                             const tagParameterMap = {
-                                'sepsis': ['HR', 'BP_Mean', 'Temperature'], // Sepsis affects HR, BP_Mean, and Temperature (confirmed in SharedDataManager)
-                                'pneumonie': ['AF', 'Saturatie', 'HR', 'BP_Mean', 'Temperature'] // Pneumonie affects AF, Saturatie, HR, BP_Mean, and Temperature
+                                'sepsis': ['HR', 'BP_Mean'], // Sepsis affects HR and BP_Mean only (from SharedDataManager tagMatrix)
+                                'pneumonie': ['AF'] // Pneumonie affects AF only (from SharedDataManager tagMatrix)
                             };
                             
                             return tagParameterMap[tag] && tagParameterMap[tag].includes(parameter);
@@ -1418,7 +1634,8 @@
                             // But only highlight those that are ACTUALLY affected by this specific tag
                             
                             if (parameters.HR && hrRange) {
-                                hrRange.textContent = `${parameters.HR.min} - ${parameters.HR.max} ${parameters.HR.unit}`;
+                                const hrUnit = parameters.HR.unit || 'bpm';
+                                hrRange.textContent = `${parameters.HR.min} - ${parameters.HR.max} ${hrUnit}`;
                                 if (isParameterAffectedByTag('HR', tag)) {
                                     highlightParameterChange(hrRange, highlightClass, `${tag} affected HR`);
                                     console.log(`✅ Updated and HIGHLIGHTED HR display with ${tag} delta:`, hrRange.textContent);
@@ -1428,7 +1645,8 @@
                             }
                             
                             if (parameters.BP_Mean && bpRange) {
-                                bpRange.textContent = `${parameters.BP_Mean.min} - ${parameters.BP_Mean.max} ${parameters.BP_Mean.unit}`;
+                                const bpUnit = parameters.BP_Mean.unit || 'mmHg';
+                                bpRange.textContent = `${parameters.BP_Mean.min} - ${parameters.BP_Mean.max} ${bpUnit}`;
                                 if (isParameterAffectedByTag('BP_Mean', tag)) {
                                     highlightParameterChange(bpRange, highlightClass, `${tag} affected BP`);
                                     console.log(`✅ Updated and HIGHLIGHTED BP display with ${tag} delta:`, bpRange.textContent);
@@ -1448,7 +1666,8 @@
                             }
                             
                             if (parameters.Saturatie && saturatieRange) {
-                                saturatieRange.textContent = `${parameters.Saturatie.min} - ${parameters.Saturatie.max}${parameters.Saturatie.unit}`;
+                                const satUnit = parameters.Saturatie.unit || '%';
+                                saturatieRange.textContent = `${parameters.Saturatie.min} - ${parameters.Saturatie.max}${satUnit}`;
                                 if (isParameterAffectedByTag('Saturatie', tag)) {
                                     highlightParameterChange(saturatieRange, highlightClass, `${tag} affected Saturatie`);
                                     console.log(`✅ Updated and HIGHLIGHTED Saturatie display with ${tag} delta:`, saturatieRange.textContent);
@@ -1458,7 +1677,10 @@
                             }
                             
                             if (parameters.Temperature && tempRange) {
-                                tempRange.textContent = `${parameters.Temperature.min} - ${parameters.Temperature.max} ${parameters.Temperature.unit}`;
+                                const tempUnit = parameters.Temperature.unit || '°C';
+                                const tempMin = (Math.round(parameters.Temperature.min * 10) / 10).toFixed(1);
+                                const tempMax = (Math.round(parameters.Temperature.max * 10) / 10).toFixed(1);
+                                tempRange.textContent = `${tempMin} - ${tempMax}${tempUnit}`;
                                 if (isParameterAffectedByTag('Temperature', tag)) {
                                     highlightParameterChange(tempRange, highlightClass, `${tag} affected Temperature`);
                                     console.log(`✅ Updated and HIGHLIGHTED Temperature display with ${tag} delta:`, tempRange.textContent);
@@ -1888,6 +2110,37 @@
             if (value) {
                 window.dataManager?.setSelectedProblem(selectedProblem);
                 updateOrganCirclesBasedOnProblem(selectedProblem);
+                
+                // WEBSOCKET FIX: Save medical problem AFTER organ levels are calculated
+                // Similar pattern to risk level handler - wait for applyProblemSpecificMonitoring to complete
+                setTimeout(() => {
+                    if (currentPatientId && window.sharedDataManager) {
+                        const existingMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
+                        const updatedMedicalInfo = {
+                            ...existingMedicalInfo,
+                            selectedProblem: selectedProblem,
+                            selectedRiskLevel: selectedRiskLevel,
+                            selectedTags: selectedTags,
+                            lastUpdated: new Date().toISOString()
+                        };
+                        window.sharedDataManager.savePatientMedicalInfo(currentPatientId, updatedMedicalInfo);
+                        console.log('✅ WEBSOCKET FIX: Medical problem saved AFTER organ calculations - triggers WebSocket:', selectedProblem);
+                        
+                        // Debug: Check what was actually stored
+                        console.log('🔍 Debug - Organ levels after medical problem selection:');
+                        console.log('  Heart:', window.sharedDataManager.getHeartMonitoringLevel(currentPatientId));
+                        console.log('  Lung:', window.sharedDataManager.getLungMonitoringLevel(currentPatientId));
+                        console.log('  Temp:', window.sharedDataManager.getTempMonitoringLevel(currentPatientId));
+                    }
+                }, 150); // Increased delay to match successful risk level pattern
+                
+                // Clear flag after processing
+                setTimeout(() => {
+                    if (window.sharedDataManager) {
+                        window.sharedDataManager.setUserChangingProblem(false);
+                    }
+                }, 200);
+                
                 // updateProgressBar is called by updateOrganCircles, no need to call it here
             }
         }

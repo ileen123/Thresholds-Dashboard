@@ -49,6 +49,10 @@
         }
     </style>
     
+    <!-- WebSocket Communication Scripts -->
+    <script src="js/websocket-outbound-client.js"></script>
+    <script src="js/websocket-connection-manager.js"></script>
+    
     <!-- Data Manager for cross-page data synchronization -->
     <script src="js/shared-data-manager.js"></script>
 </head>
@@ -382,7 +386,8 @@
             // But only highlight those that are ACTUALLY affected by this specific tag
             
             if (parameters.HR && valueNumbers[0]) {
-                valueNumbers[0].textContent = `${parameters.HR.min} - ${parameters.HR.max} ${parameters.HR.unit}`;
+                const hrUnit = parameters.HR.unit || 'bpm';
+                valueNumbers[0].textContent = `${parameters.HR.min} - ${parameters.HR.max} ${hrUnit}`;
                 if (isParameterAffectedByTag('HR', tag)) {
                     highlightParameterChange(valueNumbers[0], highlightClass, `${tag} affected HR`);
                     console.log(`✅ Updated and HIGHLIGHTED HR display with ${tag} delta:`, valueNumbers[0].textContent);
@@ -392,7 +397,8 @@
             }
             
             if (parameters.BP_Mean && valueNumbers[1]) {
-                valueNumbers[1].textContent = `${parameters.BP_Mean.min} - ${parameters.BP_Mean.max} ${parameters.BP_Mean.unit}`;
+                const bpUnit = parameters.BP_Mean.unit || 'mmHg';
+                valueNumbers[1].textContent = `${parameters.BP_Mean.min} - ${parameters.BP_Mean.max} ${bpUnit}`;
                 if (isParameterAffectedByTag('BP_Mean', tag)) {
                     highlightParameterChange(valueNumbers[1], highlightClass, `${tag} affected BP`);
                     console.log(`✅ Updated and HIGHLIGHTED BP display with ${tag} delta:`, valueNumbers[1].textContent);
@@ -402,7 +408,8 @@
             }
             
             if (parameters.Saturatie && valueNumbers[2]) {
-                valueNumbers[2].textContent = `${parameters.Saturatie.min} - ${parameters.Saturatie.max}${parameters.Saturatie.unit}`;
+                const satUnit = parameters.Saturatie.unit || '%';
+                valueNumbers[2].textContent = `${parameters.Saturatie.min} - ${parameters.Saturatie.max}${satUnit}`;
                 if (isParameterAffectedByTag('Saturatie', tag)) {
                     highlightParameterChange(valueNumbers[2], highlightClass, `${tag} affected Saturatie`);
                     console.log(`✅ Updated and HIGHLIGHTED Saturatie display with ${tag} delta:`, valueNumbers[2].textContent);
@@ -422,7 +429,10 @@
             }
             
             if (parameters.Temperature && valueNumbers[4]) {
-                valueNumbers[4].textContent = `${parameters.Temperature.min} - ${parameters.Temperature.max} ${parameters.Temperature.unit}`;
+                const tempUnit = parameters.Temperature.unit || '°C';
+                const tempMin = (Math.round(parameters.Temperature.min * 10) / 10).toFixed(1);
+                const tempMax = (Math.round(parameters.Temperature.max * 10) / 10).toFixed(1);
+                valueNumbers[4].textContent = `${tempMin} - ${tempMax}${tempUnit}`;
                 if (isParameterAffectedByTag('Temperature', tag)) {
                     highlightParameterChange(valueNumbers[4], highlightClass, `${tag} affected Temperature`);
                     console.log(`✅ Updated and HIGHLIGHTED Temperature display with ${tag} delta:`, valueNumbers[4].textContent);
@@ -499,68 +509,123 @@
          * Called on page load to ensure displays match the source of truth
          */
         function syncDisplaysWithCentralizedRanges() {
-            console.log('🌐 SIMPLE SYNC: Updating alarm overview displays with global variables...');
+            console.log('🌐 EFFECTIVE VALUES SYNC: Updating alarm overview displays with effective values...');
 
             // Check if user is manually changing problems - if so, apply highlighting after updates
             const isUserChangingProblem = window.sharedDataManager?.isUserManuallyChangingProblem();
             console.log('🎨 SYNC: User changing problem?', isUserChangingProblem);
 
-            // Update parameter displays - simple direct approach
+            // Get effective values instead of global variables
+            if (!currentPatientId) {
+                console.log('❌ SYNC: No current patient ID - cannot get effective values');
+                return;
+            }
+
+            const effectiveValues = window.sharedDataManager.getCurrentEffectiveValues(
+                currentPatientId, 
+                { forceRefresh: true }
+            );
+            
+            if (!effectiveValues || !effectiveValues.parameterRanges) {
+                console.log('❌ SYNC: No effective values available for patient:', currentPatientId);
+                return;
+            }
+
+            const ranges = effectiveValues.parameterRanges;
+            const hasManualOverrides = effectiveValues.manualOverrides && Object.keys(effectiveValues.manualOverrides).length > 0;
+            
+            console.log('📊 SYNC: Using effective values for patient:', currentPatientId);
+            console.log('🔧 SYNC: Manual overrides detected:', hasManualOverrides);
+            if (hasManualOverrides) {
+                console.log('🔧 SYNC: Manual override parameters:', Object.keys(effectiveValues.manualOverrides));
+            }
+
+            // Update parameter displays with effective values
             const valueNumbers = document.querySelectorAll('.value-number');
             
-            if (valueNumbers.length >= 5) {
-                // Update HR display from global variables
-                if (valueNumbers[0]) {
-                    valueNumbers[0].textContent = `${window.HR_MIN} - ${window.HR_MAX} bpm`;
-                    console.log('📊 Updated HR display:', valueNumbers[0].textContent);
+            if (valueNumbers.length >= 5 && ranges) {
+                // Update HR display from effective values
+                if (valueNumbers[0] && ranges.HR) {
+                    const hrText = `${ranges.HR.min} - ${ranges.HR.max} ${ranges.HR.unit || 'bpm'}`;
+                    valueNumbers[0].textContent = hrText;
+                    console.log('📊 Updated HR display from effective values:', hrText);
                     
-                    // Apply highlighting if user is changing problems
-                    if (isUserChangingProblem) {
+                    // Apply highlighting if user is changing problems OR if manual override
+                    if (isUserChangingProblem || (hasManualOverrides && effectiveValues.manualOverrides.HR)) {
                         setTimeout(() => {
-                            highlightParameterChange(valueNumbers[0], 'highlight', 'Problem change affected HR');
-                            console.log('🎨 SYNC: Applied highlighting to HR after sync');
+                            const reason = effectiveValues.manualOverrides.HR ? 'Manual override active' : 'Problem change affected HR';
+                            highlightParameterChange(valueNumbers[0], 'highlight', reason);
+                            console.log('🎨 SYNC: Applied highlighting to HR:', reason);
                         }, 50);
                     }
                 }
 
-                // Update BP display from global variables
-                if (valueNumbers[1]) {
-                    valueNumbers[1].textContent = `${window.BP_MIN} - ${window.BP_MAX} mmHg`;
-                    console.log('📊 Updated BP display:', valueNumbers[1].textContent);
+                // Update BP display from effective values
+                if (valueNumbers[1] && ranges.BP_Mean) {
+                    const bpText = `${ranges.BP_Mean.min} - ${ranges.BP_Mean.max} ${ranges.BP_Mean.unit || 'mmHg'}`;
+                    valueNumbers[1].textContent = bpText;
+                    console.log('📊 Updated BP display from effective values:', bpText);
                     
-                    // Apply highlighting if user is changing problems
-                    if (isUserChangingProblem) {
+                    // Apply highlighting if user is changing problems OR if manual override
+                    if (isUserChangingProblem || (hasManualOverrides && effectiveValues.manualOverrides.BP_Mean)) {
                         setTimeout(() => {
-                            highlightParameterChange(valueNumbers[1], 'highlight', 'Problem change affected BP');
-                            console.log('🎨 SYNC: Applied highlighting to BP after sync');
+                            const reason = effectiveValues.manualOverrides.BP_Mean ? 'Manual override active' : 'Problem change affected BP';
+                            highlightParameterChange(valueNumbers[1], 'highlight', reason);
+                            console.log('🎨 SYNC: Applied highlighting to BP:', reason);
                         }, 50);
                     }
                 }
 
-                // Update Saturatie display from global variables
-                if (valueNumbers[2]) {
-                    valueNumbers[2].textContent = `${window.SAT_MIN} - ${window.SAT_MAX}%`;
-                    console.log('📊 Updated Saturatie display:', valueNumbers[2].textContent);
+                // Update Saturatie display from effective values
+                if (valueNumbers[2] && ranges.Saturatie) {
+                    const satText = `${ranges.Saturatie.min} - ${ranges.Saturatie.max}${ranges.Saturatie.unit || '%'}`;
+                    valueNumbers[2].textContent = satText;
+                    console.log('📊 Updated Saturatie display from effective values:', satText);
+                    
+                    // Apply highlighting if manual override
+                    if (hasManualOverrides && effectiveValues.manualOverrides.Saturatie) {
+                        setTimeout(() => {
+                            highlightParameterChange(valueNumbers[2], 'highlight', 'Manual override active');
+                            console.log('🎨 SYNC: Applied highlighting to Saturatie: Manual override active');
+                        }, 50);
+                    }
                 }
 
-                // Update AF display from global variables
+                // Update AF display from effective values
                 const afDisplay = document.getElementById('af-range-display-overview');
-                if (afDisplay) {
-                    afDisplay.textContent = `${window.AF_MIN} - ${window.AF_MAX} /min`;
-                    console.log('📊 Updated AF display:', afDisplay.textContent);
+                if (afDisplay && ranges.AF) {
+                    const afText = `${ranges.AF.min} - ${ranges.AF.max} ${ranges.AF.unit || '/min'}`;
+                    afDisplay.textContent = afText;
+                    console.log('📊 Updated AF display from effective values:', afText);
                     
-                    // NOTE: AF highlighting is handled by highlightParametersForProblemChange() 
-                    // with smart medical logic - don't highlight here to avoid conflicts
+                    // Apply highlighting if manual override (problem highlighting handled elsewhere)
+                    if (hasManualOverrides && effectiveValues.manualOverrides.AF) {
+                        setTimeout(() => {
+                            highlightParameterChange(afDisplay, 'highlight', 'Manual override active');
+                            console.log('🎨 SYNC: Applied highlighting to AF: Manual override active');
+                        }, 50);
+                    }
                 }
 
-                // Update Temperature display from global variables
-                if (valueNumbers[4]) {
-                    valueNumbers[4].textContent = `${window.TEMP_MIN} - ${window.TEMP_MAX}°C`;
-                    console.log('📊 Updated Temperature display:', valueNumbers[4].textContent);
+                // Update Temperature display from effective values
+                if (valueNumbers[4] && ranges.Temperature) {
+                    // Show one decimal for temperature
+                    const min = (Math.round(ranges.Temperature.min * 10) / 10).toFixed(1);
+                    const max = (Math.round(ranges.Temperature.max * 10) / 10).toFixed(1);
+                    const tempText = `${min} - ${max}${ranges.Temperature.unit || '°C'}`;
+                    valueNumbers[4].textContent = tempText;
+                    console.log('📊 Updated Temperature display from effective values:', tempText);
+                    // Apply highlighting if manual override
+                    if (hasManualOverrides && effectiveValues.manualOverrides.Temperature) {
+                        setTimeout(() => {
+                            highlightParameterChange(valueNumbers[4], 'highlight', 'Manual override active');
+                            console.log('🎨 SYNC: Applied highlighting to Temperature: Manual override active');
+                        }, 50);
+                    }
                 }
             }
 
-            console.log('✅ All alarm overview displays updated with global variables');
+            console.log('✅ All alarm overview displays updated with effective values (including manual overrides)');
             
             // Reset the user changing problem flag after highlighting is applied
             if (isUserChangingProblem && window.sharedDataManager) {
@@ -719,9 +784,24 @@
             // SIMPLE SYSTEM: Listen for global parameter changes from slider adjustments
             window.addEventListener('globalParametersChanged', function(event) {
                 console.log('🌐 Global parameters changed event received on alarm overview:', event.detail);
-                console.log('� Updating alarm overview displays with new global variables...');
+                console.log('🔄 Updating alarm overview displays with new global variables...');
                 syncDisplaysWithCentralizedRanges();
                 console.log('📊 SYNC COMPLETED on alarm overview');
+            });
+
+            // MANUAL OVERRIDE SYSTEM: Listen for manual override changes
+            window.addEventListener('manualOverrideChanged', function(event) {
+                console.log('🔧 Manual override changed event received on alarm overview:', event.detail);
+                const { patientId, parameter, action } = event.detail;
+                
+                if (patientId === currentPatientId) {
+                    console.log(`🔧 Processing manual override for patient ${patientId}: ${parameter} (${action})`);
+                    // Force refresh displays with manual overrides
+                    syncDisplaysWithCentralizedRanges();
+                    console.log('📊 MANUAL OVERRIDE SYNC COMPLETED on alarm overview');
+                } else {
+                    console.log(`⏸️ Ignoring manual override - patient mismatch (${patientId} vs ${currentPatientId})`);
+                }
             });
 
             // TAG SYSTEM: Listen for tag-based parameter changes (sepsis, pneumonie)
@@ -845,14 +925,94 @@
             });
             */
             
-            // Listen for condition state changes from other pages
+            // UNIFIED TAG SYSTEM: Listen for immediate UI updates after tag changes
+            window.addEventListener('unifiedTagUIUpdateRequired', function(event) {
+                console.log('🔄 UNIFIED TAG: Immediate UI update required:', event.detail);
+                console.log('🔄 UNIFIED TAG: About to call updateParameterRanges()...');
+                
+                const { patientId, activeTags, targetRanges, organStates } = event.detail;
+                
+                // Only update if it's for the current patient
+                if (patientId === currentPatientId) {
+                    console.log('🏷️ UNIFIED TAG: Applying immediate UI updates...');
+                    console.log('   - Active tags:', activeTags);
+                    console.log('   - Target ranges:', targetRanges);
+                    console.log('   - Organ states:', organStates);
+                    
+                    // Update monitoring levels and displays immediately
+                    refreshMonitoringLevels();
+                    updateMonitoringStatus();
+                    
+                    console.log('🔄 UNIFIED TAG: Calling updateParameterRanges() now...');
+                    updateParameterRanges();
+                    console.log('🔄 UNIFIED TAG: updateParameterRanges() call completed');
+                    
+                    // DEBUG: Log current values after update
+                    console.log('🔍 UNIFIED TAG DEBUG: Post-update verification...');
+                    if (window.sharedDataManager && currentPatientId) {
+                        const currentRanges = window.sharedDataManager.getCurrentTargetRanges(currentPatientId);
+                        const heartLevel = window.sharedDataManager.getHeartMonitoringLevel(currentPatientId);
+                        const lungLevel = window.sharedDataManager.getLungMonitoringLevel(currentPatientId);
+                        console.log('   - Current target ranges:', currentRanges);
+                        console.log('   - Current heart level:', heartLevel);
+                        console.log('   - Current lung level:', lungLevel);
+                    }
+                    
+                    console.log('✅ UNIFIED TAG: Immediate UI updates completed');
+                } else {
+                    console.log('⏭️ UNIFIED TAG: Skipping UI update - different patient');
+                }
+            });
+            
+            // UNIFIED TAG SYSTEM: Listen for unified tag state synchronization
+            window.addEventListener('unifiedTagStateSyncRequired', function(event) {
+                console.log('🔄 UNIFIED TAG: Sync required event received:', event.detail);
+                
+                const { patientId, tagStates } = event.detail;
+                
+                // Only update if it's for the current patient
+                if (patientId === currentPatientId) {
+                    console.log('🏷️ UNIFIED TAG: Syncing UI with tag states:', tagStates);
+                    
+                    // Update each tag button based on current states
+                    Object.keys(tagStates).forEach(tagName => {
+                        const isActive = tagStates[tagName];
+                        const tagButton = document.querySelector(`.tag-btn[data-condition="${tagName}"]`);
+                        
+                        if (tagButton) {
+                            if (isActive && !tagButton.classList.contains('selected')) {
+                                tagButton.classList.add('selected');
+                                if (!selectedTags.includes(tagName)) {
+                                    selectedTags.push(tagName);
+                                }
+                                console.log(`🏷️ UNIFIED TAG: Synced ${tagName} to SELECTED`);
+                            } else if (!isActive && tagButton.classList.contains('selected')) {
+                                tagButton.classList.remove('selected');
+                                selectedTags = selectedTags.filter(t => t !== tagName);
+                                console.log(`🏷️ UNIFIED TAG: Synced ${tagName} to DESELECTED`);
+                            }
+                        }
+                    });
+                    
+                    // Refresh monitoring levels and UI
+                    setTimeout(() => {
+                        console.log('🔄 UNIFIED TAG: Refreshing UI after sync event...');
+                        refreshMonitoringLevels();
+                        updateMonitoringStatus();
+                        updateParameterRanges(); // Also refresh parameter displays
+                        console.log('✅ UNIFIED TAG: UI refresh completed after sync');
+                    }, 100);
+                }
+            });
+            
+            // LEGACY: Listen for condition state changes from other pages (for non-unified tags)
             window.addEventListener('patientConditionStateChanged', function(event) {
-                console.log('🏥 Condition state changed event received:', event.detail);
+                console.log('🏥 LEGACY: Condition state changed event received:', event.detail);
                 
                 const { condition, state } = event.detail;
                 
-                // Only update if it's for the current patient
-                if (state.patientId === currentPatientId) {
+                // Only handle non-unified tags here (sepsis and pneumonie are handled by unified system)
+                if (condition !== 'sepsis' && condition !== 'pneumonie' && state.patientId === currentPatientId) {
                     const conditionButton = document.querySelector(`.tag-btn[data-condition="${condition}"]`);
                     if (conditionButton) {
                         if (state.isActive) {
@@ -861,13 +1021,13 @@
                                 if (!selectedTags.includes(condition)) {
                                     selectedTags.push(condition);
                                 }
-                                console.log(`✅ Synced ${condition} button to selected state from external change`);
+                                console.log(`✅ LEGACY: Synced ${condition} button to selected state from external change`);
                             }
                         } else {
                             if (conditionButton.classList.contains('selected')) {
                                 conditionButton.classList.remove('selected');
                                 selectedTags = selectedTags.filter(t => t !== condition);
-                                console.log(`✅ Synced ${condition} button to deselected state from external change`);
+                                console.log(`✅ LEGACY: Synced ${condition} button to deselected state from external change`);
                             }
                         }
                         
@@ -943,104 +1103,235 @@
         }
 
         // Function to refresh monitoring levels from SharedDataManager (for page navigation)
+        // SINGLE SOURCE OF TRUTH: Initialize page with unified data
+        function initializePageWithSingleSource() {
+            if (!currentPatientId || !window.sharedDataManager) {
+                console.log('⏭️ Skipping single source initialization - missing requirements');
+                return;
+            }
+            
+            console.log('🎯 ALARM-OVERVIEW: Initializing with single source of truth...');
+            
+            // Force cache refresh to ensure manual overrides are included
+            window.sharedDataManager.invalidateEffectiveValuesCache(currentPatientId);
+            console.log('🗑️ ALARM-OVERVIEW: Cache invalidated to ensure fresh data with manual overrides');
+            
+            // Get ALL effective values in one call (prevents stacking)
+            const effectiveValues = window.sharedDataManager.getCurrentEffectiveValues(
+                currentPatientId, 
+                { forceRefresh: true } // Force refresh to get manual overrides
+            );
+            
+            console.log('📦 ALARM-OVERVIEW: Received effective values package:', {
+                parameterCount: Object.keys(effectiveValues.parameterRanges).length,
+                monitoringLevels: effectiveValues.monitoringLevels,
+                activeTagCount: effectiveValues.activeTags.length,
+                manualOverrides: effectiveValues.manualOverrides ? Object.keys(effectiveValues.manualOverrides).length : 0,
+                baseContext: effectiveValues.baseContext
+            });
+            
+            // Update parameter ranges from single source
+            updateParameterRangesFromEffectiveValues(effectiveValues.parameterRanges);
+            
+            // Update monitoring levels from single source
+            updateMonitoringLevelsFromEffectiveValues(effectiveValues.monitoringLevels);
+            
+            // Update tag states from single source
+            updateTagStatesFromEffectiveValues(effectiveValues.activeTags);
+            
+            // Update monitoring status displays
+            updateMonitoringStatus();
+            
+            console.log('✅ ALARM-OVERVIEW: Single source initialization completed');
+        }
+
+        // Update parameter ranges from effective values (single source)
+        function updateParameterRangesFromEffectiveValues(parameterRanges) {
+            console.log('📊 ALARM-OVERVIEW: Updating parameter ranges from single source:', parameterRanges);
+            
+            // Update the parameter range displays with effective values
+            if (parameterRanges) {
+                // This replaces the old updateParameterRanges logic with single source data
+                Object.keys(parameterRanges).forEach(parameter => {
+                    const range = parameterRanges[parameter];
+                    if (range && range.min !== undefined && range.max !== undefined) {
+                        updateParameterDisplay(parameter, range.min, range.max, range.unit);
+                    }
+                });
+            }
+        }
+
+        // Helper function to update individual parameter display
+        function updateParameterDisplay(parameter, min, max, unit) {
+            let targetElement = null;
+            let displayText;
+            if (parameter === 'Temperature') {
+                displayText = `${(Math.round(min * 10) / 10).toFixed(1)} - ${(Math.round(max * 10) / 10).toFixed(1)}`;
+            } else {
+                displayText = `${Math.round(min)} - ${Math.round(max)}`;
+            }
+            
+            // Add unit if provided
+            if (unit) {
+                displayText += ` ${unit}`;
+            }
+            
+            // Find the target element using data-parameter attribute (more reliable)
+            const parameterRow = document.querySelector(`[data-parameter="${parameter}"]`);
+            if (parameterRow) {
+                targetElement = parameterRow.querySelector('.value-number');
+                
+                // Add default units if not provided
+                switch (parameter) {
+                    case 'HR':
+                        displayText += unit ? '' : ' bpm';
+                        break;
+                    case 'BP_Mean':
+                        displayText += unit ? '' : ' mmHg';
+                        break;
+                    case 'AF':
+                        displayText += unit ? '' : ' /min';
+                        break;
+                    case 'Saturatie':
+                        displayText += unit ? '' : ' %';
+                        break;
+                    case 'Temperature':
+                        displayText += unit ? '' : ' °C';
+                        break;
+                }
+            }
+            
+            // Update the element if found
+            if (targetElement) {
+                targetElement.textContent = displayText;
+                targetElement.classList.remove('inactive-text'); // Make sure it's visible
+                console.log(`📊 SINGLE SOURCE: Updated ${parameter} display to: ${displayText}`);
+            } else {
+                console.warn(`⚠️ SINGLE SOURCE: Could not find display element for ${parameter} (parameterRow: ${!!parameterRow})`);
+            }
+        }
+
+        // Update monitoring levels from effective values (single source)
+        function updateMonitoringLevelsFromEffectiveValues(monitoringLevels) {
+            console.log('📊 ALARM-OVERVIEW: Updating monitoring levels from single source:', monitoringLevels);
+            
+            // Update heart circle
+            if (window.organComponents?.heart && monitoringLevels.heart) {
+                const currentHeartLevel = window.organComponents.heart.getRiskLevel();
+                if (currentHeartLevel !== monitoringLevels.heart) {
+                    console.log(`💓 SINGLE SOURCE: Updating heart circle: ${currentHeartLevel} → ${monitoringLevels.heart}`);
+                    window.organComponents.heart.setRiskLevel(monitoringLevels.heart);
+                }
+            }
+            
+            // Update lung circle
+            if (window.organComponents?.lung && monitoringLevels.lung) {
+                const currentLungLevel = window.organComponents.lung.getRiskLevel();
+                if (currentLungLevel !== monitoringLevels.lung) {
+                    console.log(`🫁 SINGLE SOURCE: Updating lung circle: ${currentLungLevel} → ${monitoringLevels.lung}`);
+                    window.organComponents.lung.setRiskLevel(monitoringLevels.lung);
+                }
+            }
+            
+            // Update temp circle
+            if (window.organComponents?.temp && monitoringLevels.temp) {
+                const currentTempLevel = window.organComponents.temp.getRiskLevel();
+                if (currentTempLevel !== monitoringLevels.temp) {
+                    console.log(`🌡️ SINGLE SOURCE: Updating temp circle: ${currentTempLevel} → ${monitoringLevels.temp}`);
+                    window.organComponents.temp.setRiskLevel(monitoringLevels.temp);
+                }
+            }
+        }
+
+        // Update tag states from effective values (single source)
+        function updateTagStatesFromEffectiveValues(activeTags) {
+            console.log('�️ ALARM-OVERVIEW: Updating tag states from single source:', activeTags);
+            
+            // Clear current selectedTags and rebuild from single source
+            selectedTags = [...activeTags];
+            
+            // Update tag button visual states
+            document.querySelectorAll('.tag-btn').forEach(button => {
+                const condition = button.dataset.condition;
+                const isActive = activeTags.includes(condition);
+                
+                if (isActive && !button.classList.contains('selected')) {
+                    button.classList.add('selected');
+                    console.log(`🏷️ SINGLE SOURCE: Activated tag button: ${condition}`);
+                } else if (!isActive && button.classList.contains('selected')) {
+                    button.classList.remove('selected');
+                    console.log(`🏷️ SINGLE SOURCE: Deactivated tag button: ${condition}`);
+                }
+            });
+        }
+
         function refreshMonitoringLevels() {
             if (!currentPatientId || !window.sharedDataManager || !window.organComponents) {
                 console.log('⏭️ Skipping monitoring level refresh - missing requirements');
                 return;
             }
             
-            console.log('🔄 Refreshing monitoring levels from SharedDataManager...');
+            console.log('🔄 LEGACY: refreshMonitoringLevels called - redirecting to single source...');
             
-            // Get EFFECTIVE monitoring levels (including tag adjustments)
-            const heartLevel = window.sharedDataManager.getEffectiveHeartMonitoringLevel(currentPatientId);
-            const lungLevel = window.sharedDataManager.getEffectiveLungMonitoringLevel(currentPatientId);
-            const tempLevel = window.sharedDataManager.getEffectiveTempMonitoringLevel(currentPatientId);
-            
-            console.log('📊 Current EFFECTIVE monitoring levels (including tag adjustments):', { heartLevel, lungLevel, tempLevel });
-            
-            // Update heart circle if it exists and level has changed
-            if (window.organComponents.heart && heartLevel) {
-                const currentHeartLevel = window.organComponents.heart.getRiskLevel();
-                if (currentHeartLevel !== heartLevel) {
-                    console.log(`💓 Updating heart circle: ${currentHeartLevel} → ${heartLevel}`);
-                    window.organComponents.heart.setRiskLevel(heartLevel);
-                } else {
-                    console.log(`💓 Heart circle already at correct level: ${heartLevel}`);
-                }
-            }
-            
-            // Update lung circle if it exists and level has changed
-            if (window.organComponents.lung && lungLevel) {
-                const currentLungLevel = window.organComponents.lung.getRiskLevel();
-                if (currentLungLevel !== lungLevel) {
-                    console.log(`🫁 Updating lung circle: ${currentLungLevel} → ${lungLevel}`);
-                    window.organComponents.lung.setRiskLevel(lungLevel);
-                } else {
-                    console.log(`🫁 Lung circle already at correct level: ${lungLevel}`);
-                }
-            }
-            
-            // Update temp circle if it exists and level has changed
-            if (window.organComponents.temp && tempLevel) {
-                const currentTempLevel = window.organComponents.temp.getRiskLevel();
-                if (currentTempLevel !== tempLevel) {
-                    console.log(`🌡️ Updating temp circle: ${currentTempLevel} → ${tempLevel}`);
-                    window.organComponents.temp.setRiskLevel(tempLevel);
-                } else {
-                    console.log(`🌡️ Temp circle already at correct level: ${tempLevel}`);
-                }
-            }
-            
-            // Update monitoring status labels after refreshing circles
-            setTimeout(() => {
-                updateMonitoringStatus();
-                console.log('✅ Monitoring levels refresh completed');
-            }, 100);
+            // Use single source of truth instead of individual method calls
+            initializePageWithSingleSource();
         }
 
-        // Function to update monitoring status text based on circle states
+        // Function to update monitoring status text based on STORED VALUES (Display Truth)
         function updateMonitoringStatus() {
-            if (!window.organComponents) return;
+            if (!currentPatientId || !window.sharedDataManager) return;
             
-            console.log('🔄 Updating monitoring status displays...');
+            console.log('🔄 SINGLE SOURCE: Updating monitoring status displays...');
             
-            // Update heart status
-            if (window.organComponents.heart) {
-                const heartLevel = window.organComponents.heart.getRiskLevel();
-                const heartStatusElement = document.getElementById('heart-status');
-                if (heartStatusElement) {
-                    heartStatusElement.textContent = getStatusText(heartLevel);
-                    console.log(`💓 Heart status updated to: ${getStatusText(heartLevel)} (level: ${heartLevel})`);
-                }
+            // Get ALL effective values from single source (prevents multiple calls)
+            const effectiveValues = window.sharedDataManager.getCurrentEffectiveValues(
+                currentPatientId, 
+                { useCache: true } // Use cache to prevent redundancy
+            );
+            
+            if (!effectiveValues || !effectiveValues.monitoringLevels) {
+                console.warn('⚠️ Could not get effective monitoring levels');
+                return;
             }
             
-            // Update lung status
-            if (window.organComponents.lung) {
-                const lungLevel = window.organComponents.lung.getRiskLevel();
-                const lungStatusElement = document.getElementById('lung-status');
-                if (lungStatusElement) {
-                    lungStatusElement.textContent = getStatusText(lungLevel);
-                    console.log(`🫁 Lung status updated to: ${getStatusText(lungLevel)} (level: ${lungLevel})`);
-                }
+            const { heart: heartLevel, lung: lungLevel, temp: tempLevel } = effectiveValues.monitoringLevels;
+            
+            // Update heart status from storage
+            const heartStatusElement = document.getElementById('heart-status');
+            if (heartStatusElement) {
+                heartStatusElement.textContent = getStatusText(heartLevel);
+                console.log(`💓 Heart status updated to: ${getStatusText(heartLevel)} (level: ${heartLevel}) [FROM SINGLE SOURCE]`);
             }
             
-            // Update temp status
-            if (window.organComponents.temp) {
-                const tempLevel = window.organComponents.temp.getRiskLevel();
-                const tempStatusElement = document.getElementById('temp-status');
-                if (tempStatusElement) {
-                    tempStatusElement.textContent = getStatusText(tempLevel);
-                    console.log(`🌡️ Temp status updated to: ${getStatusText(tempLevel)} (level: ${tempLevel})`);
-                }
+            // Update lung status from storage
+            const lungStatusElement = document.getElementById('lung-status');
+            if (lungStatusElement) {
+                lungStatusElement.textContent = getStatusText(lungLevel);
+                console.log(`🫁 Lung status updated to: ${getStatusText(lungLevel)} (level: ${lungLevel}) [FROM SINGLE SOURCE]`);
             }
             
-            // Log current monitoring levels from SharedDataManager for verification
-            if (currentPatientId && window.sharedDataManager) {
-                const heartLevel = window.sharedDataManager.getHeartMonitoringLevel(currentPatientId);
-                const lungLevel = window.sharedDataManager.getLungMonitoringLevel(currentPatientId);
-                const tempLevel = window.sharedDataManager.getTempMonitoringLevel(currentPatientId);
-                console.log(`📊 Current stored monitoring levels - Heart: ${heartLevel}, Lung: ${lungLevel}, Temp: ${tempLevel}`);
+            // Update temp status from storage
+            const tempStatusElement = document.getElementById('temp-status');
+            if (tempStatusElement) {
+                tempStatusElement.textContent = getStatusText(tempLevel);
+                console.log(`🌡️ Temp status updated to: ${getStatusText(tempLevel)} (level: ${tempLevel}) [FROM SINGLE SOURCE]`);
             }
+            
+            // Sync visual components to match stored values
+            if (window.organComponents?.heart) {
+                window.organComponents.heart.setRiskLevel(heartLevel);
+                console.log(`🔄 Synced heart component to effective level: ${heartLevel}`);
+            }
+            if (window.organComponents?.lung) {
+                window.organComponents.lung.setRiskLevel(lungLevel);
+                console.log(`🔄 Synced lung component to effective level: ${lungLevel}`);
+            }
+            if (window.organComponents?.temp) {
+                window.organComponents.temp.setRiskLevel(tempLevel);
+                console.log(`� Synced temp component to stored level: ${tempLevel}`);
+            }
+            
+            console.log(`📊 SINGLE SOURCE - All monitoring levels: Heart: ${heartLevel}, Lung: ${lungLevel}, Temp: ${tempLevel}`);
         }
         
         // Function to convert risk level to Dutch status text
@@ -1163,6 +1454,174 @@
             });
         }
 
+        // Function to apply tag adjustments to organ monitoring levels (matching individual pages logic)
+        function applyTagAdjustmentsToOrganLevels(patientId, justDeselectedTag = null) {
+            console.log('🏷️ Applying tag adjustments to organ monitoring levels for patient:', patientId);
+            
+            if (!patientId || !window.sharedDataManager) {
+                console.warn('❌ Cannot apply tag adjustments - missing patientId or sharedDataManager');
+                return;
+            }
+            
+            // Get current medical context
+            const medicalInfo = window.sharedDataManager.getPatientMedicalInfo(patientId);
+            const selectedProblem = medicalInfo?.selectedProblem || 'none';
+            const selectedRiskLevel = medicalInfo?.selectedRiskLevel || 'low';
+            
+            console.log('🏷️ Medical context:', { selectedProblem, selectedRiskLevel, justDeselectedTag });
+            
+            // If a tag was just deselected, we need to revert to matrix-based values first
+            if (justDeselectedTag) {
+                console.log(`🔄 Tag deselection detected: ${justDeselectedTag} - reverting to matrix-based organ levels`);
+                
+                // Get matrix-based organ states (without any tag adjustments)
+                const matrixResult = window.sharedDataManager.applyProblemSpecificMonitoring(
+                    selectedProblem,
+                    null, // No organ components - just calculate
+                    null, // Don't save yet
+                    selectedRiskLevel,
+                    false // Don't overwrite manual adjustments
+                );
+                
+                // Start with matrix-based organ levels
+                let baseHeartLevel = matrixResult.organStates?.heart || 'mid';
+                let baseLungLevel = matrixResult.organStates?.lung || 'mid';
+                let baseTempLevel = matrixResult.organStates?.temp || 'mid';
+                
+                console.log('🏷️ Matrix-based organ levels (before remaining tags):', {
+                    heart: baseHeartLevel,
+                    lung: baseLungLevel,
+                    temp: baseTempLevel
+                });
+                
+                // Get remaining active tags (excluding the just deselected one)
+                const remainingActiveTags = [];
+                const allTags = ['sepsis', 'pneumonie'];
+                
+                allTags.forEach(tag => {
+                    if (tag !== justDeselectedTag) {
+                        const conditionState = window.sharedDataManager.getPatientConditionState(tag, patientId);
+                        if (conditionState && conditionState.isActive) {
+                            remainingActiveTags.push(tag);
+                        }
+                    }
+                });
+                
+                console.log('🏷️ Remaining active tags after deselection:', remainingActiveTags);
+                
+                // Apply remaining tag adjustments if any
+                if (remainingActiveTags.length > 0) {
+                    const baseOrganStates = {
+                        heart: baseHeartLevel,
+                        lung: baseLungLevel,
+                        temp: baseTempLevel
+                    };
+                    
+                    const tagAdjustments = window.sharedDataManager.calculateTagBasedParameterAdjustments(
+                        remainingActiveTags,
+                        {}, // Empty target ranges - we only need organ state adjustments
+                        baseOrganStates,
+                        selectedRiskLevel
+                    );
+                    
+                    baseHeartLevel = tagAdjustments.adjustedOrganStates.heart;
+                    baseLungLevel = tagAdjustments.adjustedOrganStates.lung;
+                    baseTempLevel = tagAdjustments.adjustedOrganStates.temp;
+                    
+                    console.log('🏷️ After applying remaining tag adjustments:', {
+                        heart: baseHeartLevel,
+                        lung: baseLungLevel,
+                        temp: baseTempLevel
+                    });
+                }
+                
+                // Update organ levels with the final calculated values
+                window.sharedDataManager.setHeartMonitoringLevel(patientId, baseHeartLevel);
+                window.sharedDataManager.setLungMonitoringLevel(patientId, baseLungLevel);
+                window.sharedDataManager.setTempMonitoringLevel(patientId, baseTempLevel);
+                
+                console.log(`✅ Reverted organ levels after ${justDeselectedTag} deselection:`, {
+                    heart: baseHeartLevel,
+                    lung: baseLungLevel,
+                    temp: baseTempLevel
+                });
+                
+            } else {
+                // Tag selection case - apply incremental adjustments
+                // Get current stored organ levels
+                const currentHeartLevel = window.sharedDataManager.getHeartMonitoringLevel(patientId);
+                const currentLungLevel = window.sharedDataManager.getLungMonitoringLevel(patientId);
+                const currentTempLevel = window.sharedDataManager.getTempMonitoringLevel(patientId);
+                
+                console.log('🏷️ Current organ levels before tag adjustment:', {
+                    heart: currentHeartLevel,
+                    lung: currentLungLevel,
+                    temp: currentTempLevel
+                });
+                
+                // Get active tags
+                const activeTags = [];
+                const sepsisCondition = window.sharedDataManager.getPatientConditionState('sepsis', patientId);
+                if (sepsisCondition && sepsisCondition.isActive) {
+                    activeTags.push('sepsis');
+                }
+                const pneumonieCondition = window.sharedDataManager.getPatientConditionState('pneumonie', patientId);
+                if (pneumonieCondition && pneumonieCondition.isActive) {
+                    activeTags.push('pneumonie');
+                }
+                
+                console.log('🏷️ Active tags for organ level adjustment:', activeTags);
+                
+                if (activeTags.length > 0) {
+                    // Apply tag-based monitoring deltas to current levels
+                    const baseOrganStates = {
+                        heart: currentHeartLevel,
+                        lung: currentLungLevel,
+                        temp: currentTempLevel
+                    };
+                    
+                    const tagAdjustments = window.sharedDataManager.calculateTagBasedParameterAdjustments(
+                        activeTags,
+                        {}, // Empty target ranges - we only need organ state adjustments
+                        baseOrganStates,
+                        selectedRiskLevel
+                    );
+                    
+                    const adjustedHeartLevel = tagAdjustments.adjustedOrganStates.heart;
+                    const adjustedLungLevel = tagAdjustments.adjustedOrganStates.lung;
+                    const adjustedTempLevel = tagAdjustments.adjustedOrganStates.temp;
+                    
+                    console.log('🏷️ Tag-adjusted organ levels:', {
+                        heart: `${currentHeartLevel} → ${adjustedHeartLevel}`,
+                        lung: `${currentLungLevel} → ${adjustedLungLevel}`,
+                        temp: `${currentTempLevel} → ${adjustedTempLevel}`
+                    });
+                    
+                    // Update heart level if changed
+                    if (adjustedHeartLevel !== currentHeartLevel) {
+                        window.sharedDataManager.setHeartMonitoringLevel(patientId, adjustedHeartLevel);
+                        console.log(`✅ Updated heart level: ${currentHeartLevel} → ${adjustedHeartLevel}`);
+                    }
+                    
+                    // Update lung level if changed
+                    if (adjustedLungLevel !== currentLungLevel) {
+                        window.sharedDataManager.setLungMonitoringLevel(patientId, adjustedLungLevel);
+                        console.log(`✅ Updated lung level: ${currentLungLevel} → ${adjustedLungLevel}`);
+                    }
+                    
+                    // Update temp level if changed
+                    if (adjustedTempLevel !== currentTempLevel) {
+                        window.sharedDataManager.setTempMonitoringLevel(patientId, adjustedTempLevel);
+                        console.log(`✅ Updated temp level: ${currentTempLevel} → ${adjustedTempLevel}`);
+                    }
+                    
+                    console.log('✅ Tag adjustments applied to organ monitoring levels');
+                } else {
+                    console.log('ℹ️ No active tags - organ levels remain unchanged');
+                }
+            }
+        }
+
         function setupEventListeners() {
             // Set up problem dropdown listener
             const problemDropdown = document.getElementById('problem-dropdown');
@@ -1236,64 +1695,75 @@
                 });
             });
 
-            // Event listeners for tag buttons (matching setup page structure)
+            // UNIFIED TAG HANDLING: Event listeners for tag buttons
             document.querySelectorAll('.tag-btn').forEach(button => {
                 button.addEventListener('click', function() {
                     const condition = this.dataset.condition;
-                    if (this.classList.contains('selected')) {
-                        // Deselect tag
-                        this.classList.remove('selected');
-                        selectedTags = selectedTags.filter(t => t !== condition);
+                    const isCurrentlySelected = this.classList.contains('selected');
+                    const newState = !isCurrentlySelected;
+                    
+                    console.log(`🏷️ UNIFIED TAG: ${condition} clicked, changing from ${isCurrentlySelected} to ${newState}`);
+                    
+                    // Handle condition using unified tag system for sepsis and pneumonie
+                    if (currentPatientId && window.sharedDataManager && (condition === 'sepsis' || condition === 'pneumonie')) {
+                        // Use unified tag system
+                        const result = window.sharedDataManager.toggleConditionTag(currentPatientId, condition, newState);
                         
-                        // Handle condition deselection using new condition state system
-                        if (currentPatientId && window.sharedDataManager) {
-                            // Use new tag parameter system for sepsis and pneumonie
-                            if (condition === 'sepsis' || condition === 'pneumonie') {
-                                console.log(`🏷️ Deactivating ${condition} tag with parameter adjustments`);
-                                window.sharedDataManager.toggleConditionTag(currentPatientId, condition, false);
-                                
-                                // Update monitoring status labels after tag deselection
-                                // Use longer delay to ensure all events and circle updates have completed
-                                setTimeout(() => updateMonitoringStatus(), 100);
-                            } else {
-                                // Use old system for other conditions
-                                window.sharedDataManager.setPatientConditionState(condition, {
-                                    isActive: false,
-                                    patientId: currentPatientId,
-                                    timestamp: Date.now(),
-                                    source: 'alarm-overview'
-                                });
-                            }
+                        if (result && result.skipped) {
+                            console.log(`⚠️ UNIFIED TAG: Tag ${condition} toggle skipped - ${result.reason}`);
+                            return; // Don't update UI if operation was skipped
                         }
-                    } else {
-                        // Select tag
-                        this.classList.add('selected');
-                        selectedTags.push(condition);
                         
-                        // Handle condition selection using new condition state system
-                        if (currentPatientId && window.sharedDataManager) {
-                            // Use new tag parameter system for sepsis and pneumonie
-                            if (condition === 'sepsis' || condition === 'pneumonie') {
-                                console.log(`🏷️ Activating ${condition} tag with parameter adjustments`);
-                                window.sharedDataManager.toggleConditionTag(currentPatientId, condition, true);
-                                
-                                // Update monitoring status labels after tag selection
-                                // Use longer delay to ensure all events and circle updates have completed
-                                setTimeout(() => updateMonitoringStatus(), 100);
-                            } else {
-                                // Use old system for other conditions
-                                window.sharedDataManager.setPatientConditionState(condition, {
-                                    isActive: true,
-                                    patientId: currentPatientId,
-                                    timestamp: Date.now(),
-                                    source: 'alarm-overview'
-                                });
-                            }
+                        // Update local UI
+                        if (newState) {
+                            this.classList.add('selected');
+                            selectedTags.push(condition);
+                        } else {
+                            this.classList.remove('selected');
+                            selectedTags = selectedTags.filter(t => t !== condition);
                         }
+                        
+                        console.log(`🏷️ UNIFIED TAG: ${condition} ${newState ? 'selected' : 'deselected'} via unified system`);
+                        
+                        // DEBUG: Log immediate state after toggle
+                        console.log('🔍 UNIFIED TAG DEBUG: Immediate post-toggle state...');
+                        if (window.sharedDataManager) {
+                            const tagStates = window.sharedDataManager.getCurrentTagStatesForPatient(currentPatientId);
+                            const targetRanges = window.sharedDataManager.getCurrentTargetRanges(currentPatientId);
+                            console.log('   - All tag states:', tagStates);
+                            console.log('   - Target ranges (immediate):', targetRanges);
+                            
+                            // Force immediate UI update as backup
+                            setTimeout(() => {
+                                console.log('🔄 BACKUP: Forcing parameter range update...');
+                                updateParameterRanges();
+                            }, 50);
+                        }
+                        
+                        // UI updates now handled by unifiedTagUIUpdateRequired event from SharedDataManager
+                    } else if (currentPatientId && window.sharedDataManager) {
+                        // Use old system for other conditions
+                        if (newState) {
+                            this.classList.add('selected');
+                            selectedTags.push(condition);
+                        } else {
+                            this.classList.remove('selected');
+                            selectedTags = selectedTags.filter(t => t !== condition);
+                        }
+                        
+                        window.sharedDataManager.setPatientConditionState(condition, {
+                            isActive: newState,
+                            patientId: currentPatientId,
+                            timestamp: Date.now(),
+                            source: 'alarm-overview'
+                        });
+                        
+                        console.log(`🏷️ OLD SYSTEM: ${condition} ${newState ? 'selected' : 'deselected'} via old system`);
                     }
+                    
                     console.log('Selected tags:', selectedTags);
                     
-                    // Update parameter ranges based on selected conditions (but not for pneumonie or sepsis - they handle their own ranges)
+                    // Update parameter ranges for non-sepsis/pneumonie conditions
                     if (condition !== 'pneumonie' && condition !== 'sepsis') {
                         updateParameterRanges();
                     }
@@ -1400,6 +1870,9 @@
                 
                 console.log('✅ DEBUG: Loaded existing settings:', savedMedicalInfo);
                 
+                // SINGLE SOURCE OF TRUTH: Load and sync all data with unified approach
+                initializePageWithSingleSource();
+                
                 // Update organ circles based on loaded data
                 if (selectedProblem && selectedRiskLevel) {
                     console.log('✅ DEBUG: Updating organ circles with:', selectedProblem, selectedRiskLevel);
@@ -1408,10 +1881,54 @@
             } else {
                 console.log('❌ DEBUG: No existing medical info found for patient:', currentPatientId);
                 
+                // SINGLE SOURCE OF TRUTH: Still initialize even if no medical info
+                initializePageWithSingleSource();
+                
                 // Debug: show all available data
                 console.log('🔍 DEBUG: All patients data:', window.sharedDataManager.getAllPatients());
                 window.sharedDataManager.debugLocalStorage();
             }
+        }
+
+        // UNIFIED TAG SYSTEM: Load and sync tag states from SharedDataManager
+        function loadAndSyncUnifiedTagStates() {
+            if (!currentPatientId || !window.sharedDataManager) {
+                console.log('⏸️ Cannot load unified tag states - missing dependencies');
+                return;
+            }
+            
+            console.log('🏷️ UNIFIED TAG: Loading and syncing tag states for patient:', currentPatientId);
+            
+            // Get current tag states from SharedDataManager
+            const tagStates = window.sharedDataManager.getCurrentTagStatesForPatient(currentPatientId);
+            
+            // Update UI for each tag
+            Object.keys(tagStates).forEach(tagName => {
+                const isActive = tagStates[tagName];
+                const tagButton = document.querySelector(`.tag-btn[data-condition="${tagName}"]`);
+                
+                if (tagButton) {
+                    if (isActive) {
+                        if (!tagButton.classList.contains('selected')) {
+                            tagButton.classList.add('selected');
+                            if (!selectedTags.includes(tagName)) {
+                                selectedTags.push(tagName);
+                            }
+                        }
+                        console.log(`🏷️ UNIFIED TAG: Loaded ${tagName} as SELECTED`);
+                    } else {
+                        if (tagButton.classList.contains('selected')) {
+                            tagButton.classList.remove('selected');
+                            selectedTags = selectedTags.filter(t => t !== tagName);
+                        }
+                        console.log(`🏷️ UNIFIED TAG: Loaded ${tagName} as DESELECTED`);
+                    }
+                } else {
+                    console.log(`⚠️ UNIFIED TAG: No button found for tag: ${tagName}`);
+                }
+            });
+            
+            console.log('🏷️ UNIFIED TAG: Final selectedTags after loading:', selectedTags);
         }
 
         // Comprehensive function to synchronize all monitoring levels
@@ -1512,6 +2029,7 @@
             }
         }
 
+
         function initializeSepsisTagState() {
             console.log('🏥 Initializing condition states on alarm overview...');
             
@@ -1558,173 +2076,27 @@
         }
 
         function updateParameterRanges(shouldHighlight = false, highlightCondition = null) {
-            console.log('🔍 DEBUG: Updating parameter ranges for selected tags:', selectedTags, 'shouldHighlight:', shouldHighlight, 'highlightCondition:', highlightCondition);
+            console.log('🔍 LEGACY: updateParameterRanges called - redirecting to single source...');
             
-            // Get patient-specific target ranges first
-            let targetRanges = null;
-            if (currentPatientId && window.sharedDataManager) {
-                targetRanges = window.sharedDataManager.getPatientTargetRanges(currentPatientId);
-                console.log('🎯 Patient target ranges:', targetRanges);
+            if (!currentPatientId || !window.sharedDataManager) {
+                console.warn('⚠️ Cannot update parameter ranges - missing requirements');
+                return;
             }
             
-            // If we have target ranges, use them; otherwise fall back to condition-based logic
-            if (targetRanges) {
-                // Check which conditions are currently active
-                const hasSepsis = selectedTags.some(tag => tag.toLowerCase().includes('sepsis'));
-                const hasPneumonie = selectedTags.some(tag => tag.toLowerCase().includes('pneumonie'));
-                
-                // Always update HR display if target ranges exist (for manual adjustments)
-                if (targetRanges.HR) {
-                    const circulatoryCard = document.querySelector('.value-card');
-                    const hrRange = circulatoryCard?.querySelector('.value-number');
-                    
-                    if (hrRange) {
-                        const hr = targetRanges.HR;
-                        hrRange.textContent = Math.round(hr.min) + ' - ' + Math.round(hr.max) + ' ' + (hr.unit || 'bpm');
-                        console.log('🎯 Updated HR range from target ranges:', Math.round(hr.min) + ' - ' + Math.round(hr.max) + ' ' + (hr.unit || 'bpm'));
-                        
-                        // Apply highlighting only if sepsis is active AND we should highlight (tag button clicked) AND it's sepsis-specific
-                        if (hasSepsis && shouldHighlight && (highlightCondition === 'sepsis' || highlightCondition === null)) {
-                            window.sharedDataManager.highlightElement(hrRange, 'highlight-blue', 1500);
-                            console.log('✅ Applied sepsis highlighting to HR display');
-                        }
-                    }
-                }
-                
-                // Always update BP display if target ranges exist (for manual adjustments)
-                if (targetRanges.BP_Mean) {
-                    const bpCards = document.querySelectorAll('.value-card');
-                    if (bpCards.length > 0) {
-                        // Get the BP range from the circulatory card (1st card, 2nd value-number)
-                        const bpRange = bpCards[0]?.querySelectorAll('.value-number')[1];
-                        if (bpRange) {
-                            const bp = targetRanges.BP_Mean;
-                            bpRange.textContent = Math.round(bp.min) + ' - ' + Math.round(bp.max) + ' ' + (bp.unit || 'mmHg');
-                            console.log('🎯 Updated BP range from target ranges:', Math.round(bp.min) + ' - ' + Math.round(bp.max) + ' ' + (bp.unit || 'mmHg'));
-                            
-                            // Apply highlighting only if sepsis is active AND we should highlight (tag button clicked) AND it's sepsis-specific
-                            if (hasSepsis && shouldHighlight && (highlightCondition === 'sepsis' || highlightCondition === null)) {
-                                window.sharedDataManager.highlightElement(bpRange, 'highlight-blue', 1500);
-                                console.log('✅ Applied sepsis highlighting to BP display');
-                            }
-                        } else {
-                            console.warn('❌ BP range element not found');
-                        }
-                    } else {
-                        console.warn('❌ BP cards not found');
-                    }
-                }
-                
-                // Always update AF display if target ranges exist (for manual adjustments)
-                if (targetRanges.AF) {
-                    const afRangeDisplay = document.getElementById('af-range-display-overview');
-                    if (afRangeDisplay) {
-                        const af = targetRanges.AF;
-                        afRangeDisplay.textContent = Math.round(af.min) + ' - ' + Math.round(af.max) + ' ' + (af.unit || '/min');
-                        console.log('🎯 Updated AF range from target ranges:', Math.round(af.min) + ' - ' + Math.round(af.max) + ' ' + (af.unit || '/min'));
-                        
-                        // Apply highlighting only if pneumonie is active AND we should highlight (tag button clicked) AND it's pneumonie-specific
-                        if (hasPneumonie && shouldHighlight && (highlightCondition === 'pneumonie' || highlightCondition === null)) {
-                            window.sharedDataManager.highlightElement(afRangeDisplay, 'highlight-blue', 1500);
-                            console.log('✅ Applied pneumonie highlighting to AF display');
-                        }
-                        
-                        // Remove inactive-text class if present
-                        afRangeDisplay.classList.remove('inactive-text');
-                    } else {
-                        console.warn('❌ AF range display element not found with ID: af-range-display-overview');
-                    }
-                } else {
-                    console.warn('❌ No AF data in target ranges');
-                }
-                
-                // Always update Saturatie display if target ranges exist (for manual adjustments)
-                if (targetRanges.Saturatie) {
-                    const respiratoryCards = document.querySelectorAll('.value-card');
-                    if (respiratoryCards.length > 1) {
-                        // Get the Saturatie range from the respiratory card (2nd card, 1st value-number)
-                        const saturatieRange = respiratoryCards[1]?.querySelector('.value-number');
-                        if (saturatieRange) {
-                            const saturatie = targetRanges.Saturatie;
-                            saturatieRange.textContent = Math.round(saturatie.min) + ' - ' + Math.round(saturatie.max) + ' ' + (saturatie.unit || '%');
-                            console.log('🎯 Updated Saturatie range from target ranges:', Math.round(saturatie.min) + ' - ' + Math.round(saturatie.max) + ' ' + (saturatie.unit || '%'));
-                            
-                            // Remove inactive-text class if present to make the text visible
-                            saturatieRange.classList.remove('inactive-text');
-                        } else {
-                            console.warn('❌ Saturatie range element not found');
-                        }
-                    } else {
-                        console.warn('❌ Respiratory card not found');
-                    }
-                } else {
-                    console.log('ℹ️ No Saturatie data in target ranges');
-                }
-                
-                // Always update Temperature display if target ranges exist (for manual adjustments)
-                if (targetRanges.Temperature) {
-                    const temperatureCards = document.querySelectorAll('.value-card');
-                    if (temperatureCards.length > 2) {
-                        // Get the Temperature range from the other card (3rd card, 1st value-number)
-                        const temperatureRange = temperatureCards[2]?.querySelector('.value-number');
-                        if (temperatureRange) {
-                            const temperature = targetRanges.Temperature;
-                            temperatureRange.textContent = temperature.min + ' - ' + temperature.max + ' ' + (temperature.unit || '°C');
-                            console.log('🎯 Updated Temperature range from target ranges:', temperature.min + ' - ' + temperature.max + ' ' + (temperature.unit || '°C'));
-                            
-                            // Remove inactive-text class if present to make the text visible
-                            temperatureRange.classList.remove('inactive-text');
-                        } else {
-                            console.warn('❌ Temperature range element not found');
-                        }
-                    } else {
-                        console.warn('❌ Temperature card not found');
-                    }
-                } else {
-                    console.log('ℹ️ No Temperature data in target ranges');
-                }
-            } else {
-                // Fall back to original condition-based logic
-                console.log('🔍 DEBUG: No target ranges found, using condition-based thresholds');
-                
-                // Check if sepsis is selected
-                const hasSepsis = selectedTags.some(tag => tag.toLowerCase().includes('sepsis'));
-                console.log('🔍 DEBUG: Has sepsis tag:', hasSepsis);
-                
-                // Get thresholds from shared data manager
-                const normalThresholds = window.sharedDataManager.getThresholds('normal');
-                const sepsisThresholds = window.sharedDataManager.getThresholds('conditions')?.sepsis;
-                
-                console.log('🔍 DEBUG: Normal thresholds:', normalThresholds);
-                console.log('🔍 DEBUG: Sepsis thresholds:', sepsisThresholds);
-                
-                // DISABLED: Sepsis no longer changes thresholds, only visual state
-                // Always use normal thresholds regardless of sepsis selection
-                const currentThresholds = normalThresholds;
-                
-                console.log('🔍 DEBUG: Using thresholds:', currentThresholds);
-                
-                // DISABLED: Update circulatory parameters (HR) - sepsis no longer changes ranges
-                // Sepsis only provides visual feedback, no range changes
-                /*
-                if (hasSepsis) {
-                    const circulatoryCard = document.querySelector('.value-card');
-                    const hrRange = circulatoryCard?.querySelector('.value-number');
-                    
-                    if (hrRange && currentThresholds.circulatoir && currentThresholds.circulatoir.HR) {
-                        const hr = currentThresholds.circulatoir.HR;
-                        hrRange.textContent = Math.round(hr.min) + ' - ' + Math.round(hr.max) + ' ' + hr.unit;
-                        
-                        console.log('🔍 DEBUG: Updated HR range to (sepsis):', Math.round(hr.min) + ' - ' + Math.round(hr.max) + ' ' + hr.unit);
-                        
-                        // Highlight if using sepsis thresholds
-                        if (hasSepsis && sepsisThresholds) {
-                            window.sharedDataManager.highlightElement(hrRange, 'highlight-blue', 1500);
-                            console.log('🔍 DEBUG: Applied sepsis highlighting to HR range');
-                        }
-                    }
-                }
-                */
+            // Use single source of truth instead of individual calls
+            const effectiveValues = window.sharedDataManager.getCurrentEffectiveValues(
+                currentPatientId, 
+                { useCache: false } // Force fresh calculation since this is often called after changes
+            );
+            
+            console.log('� SINGLE SOURCE: Got effective values for parameter update:', effectiveValues.parameterRanges);
+            
+            // Update parameter ranges
+            updateParameterRangesFromEffectiveValues(effectiveValues.parameterRanges);
+            
+            // Apply highlighting if requested
+            if (shouldHighlight && highlightCondition && effectiveValues.parameterRanges) {
+                highlightParametersForProblemChange(highlightCondition, null, effectiveValues.parameterRanges);
             }
         }
 
@@ -1885,7 +2257,7 @@
                 lastUpdated: new Date().toISOString()
             });
             
-            alert('Alarm instellingen succesvol opgeslagen!');
+            // alert('Alarm instellingen succesvol opgeslagen!');
             goBackToBedOverview()
         }
 
@@ -1933,7 +2305,7 @@
                 
                 setTimeout(() => {
                     // Get the updated target ranges
-                    const targetRanges = window.sharedDataManager.getPatientTargetRanges(currentPatientId);
+                    const targetRanges = window.sharedDataManager.getCurrentTargetRanges(currentPatientId);
                     if (targetRanges) {
                         highlightParametersForProblemChange(selectedProblem, oldProblem, targetRanges);
                     }
@@ -2195,7 +2567,30 @@
                 if (window.dataManager) {
                     window.dataManager.setSelectedProblem(selectedProblem);
                 }
+                
+                // CRITICAL FIX: Save medical problem IMMEDIATELY before applying changes
+                // This ensures syncDisplaysWithCentralizedRanges reads the correct problem value
+                if (currentPatientId && window.sharedDataManager) {
+                    const existingMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
+                    const updatedMedicalInfo = {
+                        ...existingMedicalInfo,
+                        selectedProblem: selectedProblem,
+                        selectedRiskLevel: selectedRiskLevel,
+                        selectedTags: selectedTags,
+                        lastUpdated: new Date().toISOString()
+                    };
+                    window.sharedDataManager.savePatientMedicalInfo(currentPatientId, updatedMedicalInfo);
+                    console.log('✅ ALARM-OVERVIEW: Medical problem saved IMMEDIATELY before calculations:', selectedProblem);
+                }
+                
                 updateOrganCirclesBasedOnProblem(selectedProblem);
+                
+                // Clear flag after processing
+                setTimeout(() => {
+                    if (window.sharedDataManager) {
+                        window.sharedDataManager.setUserChangingProblem(false);
+                    }
+                }, 250);
             }
         }
 
