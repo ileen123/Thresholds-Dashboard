@@ -119,19 +119,19 @@
             <div class="tags-section">
                 <!-- All tags in horizontal layout with wrapping -->
                 <div class="button-group tags-horizontal">
-                    <button class="btn tag-btn" data-condition="sepsis">
+                    <button class="btn tag-btn" data-condition="sepsis" onclick="debugTagClick(this, 'sepsis')">
                         Sepsis <img src="svg's/sepsis.svg" alt="Sepsis" class="sepsis-icon">
                     </button>
-                    <button class="btn tag-btn" data-condition="diabetes">
+                    <button class="btn tag-btn" data-condition="diabetes" onclick="debugTagClick(this, 'diabetes')">
                         Diabetes <img src="svg's/diabetes.svg" alt="Diabetes" class="condition-icon">
                     </button>
-                    <button class="btn tag-btn" data-condition="herstellende">
+                    <button class="btn tag-btn" data-condition="herstellende" onclick="debugTagClick(this, 'herstellende')">
                         Herstellende <img src="svg's/patient_icon.svg" alt="Herstellende" class="condition-icon">
                     </button>
-                    <button class="btn tag-btn" data-condition="pneumonie">
+                    <button class="btn tag-btn" data-condition="pneumonie" onclick="debugTagClick(this, 'pneumonie')">
                         Pneumonie <img src="svg's/lung.svg" alt="Pneumonie" class="condition-icon">
                     </button>
-                    <button class="btn tag-btn" data-condition="chronisch-nierfalen">
+                    <button class="btn tag-btn" data-condition="chronisch-nierfalen" onclick="debugTagClick(this, 'chronisch-nierfalen')">
                         Chronisch Nierfalen <img src="svg's/nierfalen.svg" alt="Nierfalen" class="condition-icon">
                     </button>
                     <!-- More button to show additional options -->
@@ -207,6 +207,86 @@
             <!-- Import Heart Circle Component -->
             <script src="js/heart-circle-component.js"></script>
             <script>
+                // Debug function for tag clicks
+                function debugTagClick(button, condition) {
+                    console.log('🔥 DEBUG: onclick handler triggered!', condition, button);
+                    console.log('🔥 Button element:', button);
+                    console.log('🔥 Button classes:', button.classList.toString());
+                    console.log('🔥 Button dataset:', button.dataset);
+                    
+                    // Call the main tag handling logic
+                    handleTagClick(button, condition);
+                }
+                
+                // Main tag click handling logic
+                function handleTagClick(button, tagCondition) {
+                    console.log('🏷️ Processing tag condition:', tagCondition);
+                    
+                    if (button.classList.contains('selected')) {
+                        // Deselect tag
+                        button.classList.remove('selected');
+                        selectedTags = selectedTags.filter(tag => tag !== tagCondition);
+                        
+                        // Add visual feedback for deselection
+                        if (window.sharedDataManager) {
+                            window.sharedDataManager.highlightElement(button, 'highlight-red', 800);
+                        }
+                        
+                        // Handle condition deselection using new condition state system
+                        if (currentPatientId && window.sharedDataManager) {
+                            // Use new tag parameter system for sepsis and pneumonie
+                            if (tagCondition === 'sepsis' || tagCondition === 'pneumonie') {
+                                console.log(`🏷️ Deactivating ${tagCondition} tag with parameter adjustments (setup-page)`);
+                                window.sharedDataManager.toggleConditionTag(currentPatientId, tagCondition, false);
+                            } else {
+                                // Use old system for other conditions
+                                window.sharedDataManager.setPatientConditionState(tagCondition, {
+                                    isActive: false,
+                                    patientId: currentPatientId,
+                                    timestamp: Date.now(),
+                                    source: 'setup-page'
+                                });
+                            }
+                        }
+                    } else {
+                        // Select tag
+                        button.classList.add('selected');
+                        if (!selectedTags.includes(tagCondition)) {
+                            selectedTags.push(tagCondition);
+                        }
+                        
+                        // Add visual feedback for selection
+                        if (window.sharedDataManager) {
+                            window.sharedDataManager.highlightElement(button, 'highlight-blue', 800);
+                        }
+                        
+                        // Handle condition selection using new condition state system
+                        if (currentPatientId && window.sharedDataManager) {
+                            // Use new tag parameter system for sepsis and pneumonie
+                            if (tagCondition === 'sepsis' || tagCondition === 'pneumonie') {
+                                console.log(`🏷️ Activating ${tagCondition} tag with parameter adjustments (setup-page)`);
+                                window.sharedDataManager.toggleConditionTag(currentPatientId, tagCondition, true);
+                            } else {
+                                // Use old system for other conditions
+                                window.sharedDataManager.setPatientConditionState(tagCondition, {
+                                    isActive: true,
+                                    patientId: currentPatientId,
+                                    timestamp: Date.now(),
+                                    source: 'setup-page'
+                                });
+                            }
+                        }
+                    }
+                    
+                    window.dataManager?.setSelectedTags(selectedTags);
+                    
+                    // Apply parameter range updates for non-matrix tags
+                    if (tagCondition !== 'sepsis' && tagCondition !== 'pneumonie') {
+                        console.log('🔄 Updating parameter ranges for condition:', tagCondition);
+                        updateParameterRanges();
+                    }
+                }
+
                 // Global variables for current session
                 let selectedProblem = '';
                 let selectedRiskLevel = '';
@@ -542,14 +622,14 @@
                             // Update and highlight HR (always affected)
                             if (affectedParameters.includes('HR') && newParameters.HR && valueNumbers[0]) {
                                 valueNumbers[0].textContent = `${newParameters.HR.min} - ${newParameters.HR.max} ${newParameters.HR.unit}`;
-                                highlightParameterChange(valueNumbers[0], 'highlight', `Problem change (${oldProblem}→${newProblem}) affected HR`);
+                                window.sharedDataManager.highlightElement(valueNumbers[0], 'highlight-blue', 1500);
                                 console.log(`✅ Updated and HIGHLIGHTED HR for problem change:`, valueNumbers[0].textContent);
                             }
                             
                             // Update and highlight BP_Mean (always affected)
                             if (affectedParameters.includes('BP_Mean') && newParameters.BP_Mean && valueNumbers[1]) {
                                 valueNumbers[1].textContent = `${newParameters.BP_Mean.min} - ${newParameters.BP_Mean.max} ${newParameters.BP_Mean.unit}`;
-                                highlightParameterChange(valueNumbers[1], 'highlight', `Problem change (${oldProblem}→${newProblem}) affected BP`);
+                                window.sharedDataManager.highlightElement(valueNumbers[1], 'highlight-blue', 1500);
                                 console.log(`✅ Updated and HIGHLIGHTED BP for problem change:`, valueNumbers[1].textContent);
                             }
                             
@@ -557,7 +637,7 @@
                             if (newParameters.AF && afDisplay) {
                                 afDisplay.textContent = `${newParameters.AF.min} - ${newParameters.AF.max} /min`;
                                 if (affectedParameters.includes('AF')) {
-                                    highlightParameterChange(afDisplay, 'highlight', `Problem change (${oldProblem}→${newProblem}) affected AF`);
+                                    window.sharedDataManager.highlightElement(afDisplay, 'highlight-blue', 1500);
                                     console.log(`✅ Updated and HIGHLIGHTED AF for problem change:`, afDisplay.textContent);
                                 } else {
                                     console.log(`📊 Updated AF (no highlight - unchanged between non-respiratory conditions):`, afDisplay.textContent);
@@ -577,9 +657,12 @@
                         }
                         
                         function setupEventListeners() {
+                            console.log('🚀 setupEventListeners called');
+                            
                             // Set up problem dropdown listener
                             const problemDropdown = document.getElementById('problemDropdown');
                             if (problemDropdown) {
+                                console.log('✅ Problem dropdown found, setting up listener');
                                 problemDropdown.addEventListener('change', function() {
                                     console.log('🎯 USER manually changed main problem dropdown');
                                     // Set flag that user is manually changing problem (should overwrite manual adjustments)
@@ -618,15 +701,44 @@
                          
                             
                             // Set up tag button listeners
-                            const tagButtons = document.querySelectorAll('.tags-section .btn:not(.more-btn)');
-                            tagButtons.forEach(button => {
-                                button.addEventListener('click', function() {
+                            console.log('🔍 DEBUG: About to query for .tag-btn elements');
+                            const tagButtons = document.querySelectorAll('.tag-btn');
+                            console.log('🔍 DEBUG: Found tag buttons:', tagButtons.length, tagButtons);
+                            
+                            // Additional debug: check if any elements were found
+                            if (tagButtons.length === 0) {
+                                console.error('❌ No tag buttons found! Checking DOM structure...');
+                                const allButtons = document.querySelectorAll('button');
+                                console.log('🔍 All buttons in document:', allButtons.length, allButtons);
+                                const tagsSection = document.querySelector('.tags-section');
+                                console.log('🔍 Tags section:', tagsSection);
+                                return; // Exit early if no buttons found
+                            }
+                            
+                            tagButtons.forEach((button, index) => {
+                                console.log(`🔍 DEBUG: Setting up listener for button ${index}:`, button.dataset.condition, button);
+                                
+                                // Test if button is clickable
+                                button.style.border = '2px solid red'; // Visual test
+                                console.log('🔍 Button classes:', button.classList.toString());
+                                console.log('🔍 Button data-condition:', button.dataset.condition);
+                                
+                                button.addEventListener('click', function(event) {
+                                    console.log('🔥 DEBUG: Tag button clicked!', this.dataset.condition, event);
+                                    console.log('🔥 Event target:', event.target);
+                                    console.log('🔥 Current target:', event.currentTarget);
                                     const tagCondition = this.dataset.condition || this.textContent.trim(); // Use data-condition if available, fallback to text
+                                    console.log('🏷️ Processing tag condition:', tagCondition);
                                     
                                     if (this.classList.contains('selected')) {
                                         // Deselect tag
                                         this.classList.remove('selected');
                                         selectedTags = selectedTags.filter(tag => tag !== tagCondition);
+                                        
+                                        // Add visual feedback for deselection
+                                        if (window.sharedDataManager) {
+                                            window.sharedDataManager.highlightElement(this, 'highlight-red', 800);
+                                        }
                                         
                                         // Handle condition deselection using new condition state system
                                         if (currentPatientId && window.sharedDataManager) {
@@ -649,6 +761,11 @@
                                         this.classList.add('selected');
                                         if (!selectedTags.includes(tagCondition)) {
                                             selectedTags.push(tagCondition);
+                                        }
+                                        
+                                        // Add visual feedback for selection
+                                        if (window.sharedDataManager) {
+                                            window.sharedDataManager.highlightElement(this, 'highlight-blue', 800);
                                         }
                                         
                                         // Handle condition selection using new condition state system
@@ -1220,7 +1337,7 @@
                             if (newParameters.HR && hrRange) {
                                 hrRange.textContent = `${newParameters.HR.min} - ${newParameters.HR.max} ${newParameters.HR.unit}`;
                                 if (affectedParameters.includes('HR')) {
-                                    highlightParameterChange(hrRange, 'highlight', `Risk level change (${oldRiskLevel}→${newRiskLevel}) affected HR`);
+                                    window.sharedDataManager.highlightElement(hrRange, 'highlight-blue', 1500);
                                     console.log(`✅ Updated and HIGHLIGHTED HR for risk level change:`, hrRange.textContent);
                                 } else {
                                     console.log(`📊 Updated HR (no highlight - not affected by ${medicalProblem} risk change):`, hrRange.textContent);
@@ -1230,7 +1347,7 @@
                             if (newParameters.BP_Mean && bpRange) {
                                 bpRange.textContent = `${newParameters.BP_Mean.min} - ${newParameters.BP_Mean.max} ${newParameters.BP_Mean.unit}`;
                                 if (affectedParameters.includes('BP_Mean')) {
-                                    highlightParameterChange(bpRange, 'highlight', `Risk level change (${oldRiskLevel}→${newRiskLevel}) affected BP`);
+                                    window.sharedDataManager.highlightElement(bpRange, 'highlight-blue', 1500);
                                     console.log(`✅ Updated and HIGHLIGHTED BP for risk level change:`, bpRange.textContent);
                                 } else {
                                     console.log(`📊 Updated BP (no highlight - not affected by ${medicalProblem} risk change):`, bpRange.textContent);
@@ -1240,7 +1357,7 @@
                             if (newParameters.Saturatie && saturatieRange) {
                                 saturatieRange.textContent = `${newParameters.Saturatie.min} - ${newParameters.Saturatie.max}${newParameters.Saturatie.unit}`;
                                 if (affectedParameters.includes('Saturatie')) {
-                                    highlightParameterChange(saturatieRange, 'highlight', `Risk level change (${oldRiskLevel}→${newRiskLevel}) affected Saturatie`);
+                                    window.sharedDataManager.highlightElement(saturatieRange, 'highlight-blue', 1500);
                                     console.log(`✅ Updated and HIGHLIGHTED Saturatie for risk level change:`, saturatieRange.textContent);
                                 } else {
                                     console.log(`📊 Updated Saturatie (no highlight - not affected by ${medicalProblem} risk change):`, saturatieRange.textContent);
@@ -1250,7 +1367,7 @@
                             if (newParameters.AF && afDisplay) {
                                 afDisplay.textContent = `${newParameters.AF.min} - ${newParameters.AF.max}`;
                                 if (affectedParameters.includes('AF')) {
-                                    highlightParameterChange(afDisplay, 'highlight', `Risk level change (${oldRiskLevel}→${newRiskLevel}) affected AF`);
+                                    window.sharedDataManager.highlightElement(afDisplay, 'highlight-blue', 1500);
                                     console.log(`✅ Updated and HIGHLIGHTED AF for risk level change:`, afDisplay.textContent);
                                 } else {
                                     console.log(`📊 Updated AF (no highlight - not affected by ${medicalProblem} risk change):`, afDisplay.textContent);
@@ -1260,7 +1377,7 @@
                             if (newParameters.Temperature && tempRange) {
                                 tempRange.textContent = `${newParameters.Temperature.min} - ${newParameters.Temperature.max} ${newParameters.Temperature.unit}`;
                                 if (affectedParameters.includes('Temperature')) {
-                                    highlightParameterChange(tempRange, 'highlight', `Risk level change (${oldRiskLevel}→${newRiskLevel}) affected Temperature`);
+                                    window.sharedDataManager.highlightElement(tempRange, 'highlight-blue', 1500);
                                     console.log(`✅ Updated and HIGHLIGHTED Temperature for risk level change:`, tempRange.textContent);
                                 } else {
                                     console.log(`📊 Updated Temperature (no highlight - not affected by ${medicalProblem} risk change):`, tempRange.textContent);
@@ -1295,7 +1412,7 @@
                             if (parameters.HR && hrRange) {
                                 hrRange.textContent = `${parameters.HR.min} - ${parameters.HR.max} ${parameters.HR.unit}`;
                                 if (isParameterAffectedByTag('HR', tag)) {
-                                    highlightParameterChange(hrRange, highlightClass, `${tag} affected HR`);
+                                    window.sharedDataManager.highlightElement(hrRange, highlightClass, 1500);
                                     console.log(`✅ Updated and HIGHLIGHTED HR display with ${tag} delta:`, hrRange.textContent);
                                 } else {
                                     console.log(`📊 Updated HR display (no highlight - not affected by ${tag}):`, hrRange.textContent);
@@ -1305,7 +1422,7 @@
                             if (parameters.BP_Mean && bpRange) {
                                 bpRange.textContent = `${parameters.BP_Mean.min} - ${parameters.BP_Mean.max} ${parameters.BP_Mean.unit}`;
                                 if (isParameterAffectedByTag('BP_Mean', tag)) {
-                                    highlightParameterChange(bpRange, highlightClass, `${tag} affected BP`);
+                                    window.sharedDataManager.highlightElement(bpRange, highlightClass, 1500);
                                     console.log(`✅ Updated and HIGHLIGHTED BP display with ${tag} delta:`, bpRange.textContent);
                                 } else {
                                     console.log(`📊 Updated BP display (no highlight - not affected by ${tag}):`, bpRange.textContent);
@@ -1315,7 +1432,7 @@
                             if (parameters.AF && afDisplay) {
                                 afDisplay.textContent = `${parameters.AF.min} - ${parameters.AF.max}`;
                                 if (isParameterAffectedByTag('AF', tag)) {
-                                    highlightParameterChange(afDisplay, highlightClass, `${tag} affected AF`);
+                                    window.sharedDataManager.highlightElement(afDisplay, highlightClass, 1500);
                                     console.log(`✅ Updated and HIGHLIGHTED AF display with ${tag} delta:`, afDisplay.textContent);
                                 } else {
                                     console.log(`📊 Updated AF display (no highlight - not affected by ${tag}):`, afDisplay.textContent);
@@ -1325,7 +1442,7 @@
                             if (parameters.Saturatie && saturatieRange) {
                                 saturatieRange.textContent = `${parameters.Saturatie.min} - ${parameters.Saturatie.max}${parameters.Saturatie.unit}`;
                                 if (isParameterAffectedByTag('Saturatie', tag)) {
-                                    highlightParameterChange(saturatieRange, highlightClass, `${tag} affected Saturatie`);
+                                    window.sharedDataManager.highlightElement(saturatieRange, highlightClass, 1500);
                                     console.log(`✅ Updated and HIGHLIGHTED Saturatie display with ${tag} delta:`, saturatieRange.textContent);
                                 } else {
                                     console.log(`📊 Updated Saturatie display (no highlight - not affected by ${tag}):`, saturatieRange.textContent);
@@ -1335,7 +1452,7 @@
                             if (parameters.Temperature && tempRange) {
                                 tempRange.textContent = `${parameters.Temperature.min} - ${parameters.Temperature.max} ${parameters.Temperature.unit}`;
                                 if (isParameterAffectedByTag('Temperature', tag)) {
-                                    highlightParameterChange(tempRange, highlightClass, `${tag} affected Temperature`);
+                                    window.sharedDataManager.highlightElement(tempRange, highlightClass, 1500);
                                     console.log(`✅ Updated and HIGHLIGHTED Temperature display with ${tag} delta:`, tempRange.textContent);
                                 } else {
                                     console.log(`📊 Updated Temperature display (no highlight - not affected by ${tag}):`, tempRange.textContent);
@@ -1579,7 +1696,7 @@
                                 '- Additionele tags: ' + (selectedTags.length > 0 ? selectedTags.join(', ') : 'Geen') + '\n' +
                                 '- Actieve monitoring: ' + (activeOrgans.length > 0 ? activeOrgans.join(', ') : 'Geen');
                             
-                           if (confirm(summary + '\n\nWil je deze instellingen bevestigen?')) {
+                           if (1==1) { // Always true block for simplified process
                                 // Save all the selected data to patient-data.json
                                 if (window.dataManager) {
                                     window.dataManager.setSelectedProblem(selectedProblem);
@@ -1759,8 +1876,28 @@
             // Trigger all the necessary updates that the original dropdown would trigger
             if (value) {
                 window.dataManager?.setSelectedProblem(selectedProblem);
+                
+                // IMMEDIATE SAVE: Save problem selection to SharedDataManager immediately
+                if (currentPatientId && window.sharedDataManager) {
+                    const existingMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
+                    const updatedMedicalInfo = {
+                        ...existingMedicalInfo,
+                        selectedProblem: selectedProblem,
+                        selectedRiskLevel: selectedRiskLevel,
+                        selectedTags: selectedTags,
+                        lastUpdated: new Date().toISOString()
+                    };
+                    window.sharedDataManager.savePatientMedicalInfo(currentPatientId, updatedMedicalInfo);
+                    console.log('💾 Immediately saved problem selection to SharedDataManager:', selectedProblem);
+                }
+                
                 updateOrganCirclesBasedOnProblem(selectedProblem);
-                // updateProgressBar is called by updateOrganCircles, no need to call it here
+                updateProgressBar();
+                
+                // Clear flag after processing
+                if (window.sharedDataManager) {
+                    setTimeout(() => window.sharedDataManager.setUserChangingProblem(false), 100);
+                }
             }
         }
 
