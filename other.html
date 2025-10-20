@@ -959,6 +959,34 @@
         // Initialize page when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
             initializePage();
+            
+            // CONDITIONAL CLEAR: Only clear manual adjustments if problem has changed
+            const urlParams = new URLSearchParams(window.location.search);
+            const earlyPatientId = urlParams.get('patient');
+            
+            if (earlyPatientId && window.sharedDataManager) {
+                const medicalInfo = window.sharedDataManager.getPatientMedicalInfo(earlyPatientId);
+                const currentProblem = medicalInfo?.selectedProblem;
+                const lastKnownProblem = sessionStorage.getItem(`patient-${earlyPatientId}-lastKnownProblem`);
+                
+                console.log('� PROBLEM CHECK (OTHER): Current:', currentProblem, 'Last Known:', lastKnownProblem);
+                
+                // Only clear if problem has changed since last page visit
+                if (currentProblem && lastKnownProblem && currentProblem !== lastKnownProblem) {
+                    console.log('🗑️ PROBLEM CHANGED: Clearing manual adjustments from customThresholds');
+                    if (medicalInfo.customThresholds && medicalInfo.customThresholds.overig) {
+                        delete medicalInfo.customThresholds.overig.Temp;
+                        window.sharedDataManager.savePatientMedicalInfo(earlyPatientId, medicalInfo);
+                        console.log('✅ Manual adjustments cleared due to problem change:', lastKnownProblem, '→', currentProblem);
+                    }
+                }
+                
+                // Update last known problem for next page load
+                if (currentProblem) {
+                    sessionStorage.setItem(`patient-${earlyPatientId}-lastKnownProblem`, currentProblem);
+                }
+            }
+            
             setupEventListeners();
             initializeConditionStates(); // Initialize condition button states from SharedDataManager
             
@@ -1394,17 +1422,34 @@
             
             // SIMPLE APPROACH: Listen for global parameter changes
             window.addEventListener('globalParametersChanged', function(event) {
-                console.log('� Global parameters changed event received:', event.detail);
+                console.log('🌐 Global parameters changed event received:', event.detail);
+                
+                // CRITICAL: Clear saved custom values from customThresholds for this patient
+                if (currentPatientId && window.sharedDataManager) {
+                    console.log('🗑️ EVENT: Clearing customThresholds before resetting to new problem defaults');
+                    const medicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId);
+                    if (medicalInfo && medicalInfo.customThresholds && medicalInfo.customThresholds.overig) {
+                        delete medicalInfo.customThresholds.overig.Temp;
+                        window.sharedDataManager.savePatientMedicalInfo(currentPatientId, medicalInfo);
+                        console.log('✅ EVENT: Custom thresholds cleared from medicalInfo');
+                    }
+                }
+                
                 // Update temperature slider with new global variables
                 if (tempSlider && typeof tempSlider.updateConfig === 'function') {
                     tempSlider.updateConfig({
                         targetRange: { min: window.TEMP_MIN, max: window.TEMP_MAX }
                     });
+                    // CRITICAL: Reset original values so slider doesn't think these are manual changes
+                    tempSlider.originalMin = window.TEMP_MIN;
+                    tempSlider.originalMax = window.TEMP_MAX;
+                    tempSlider.currentMin = window.TEMP_MIN;
+                    tempSlider.currentMax = window.TEMP_MAX;
                     // Force visual position refresh
                     if (tempSlider.updateSliderPosition) {
                         tempSlider.updateSliderPosition();
                     }
-                    console.log('✅ Temperature slider updated from global parameters:', window.TEMP_MIN, '-', window.TEMP_MAX);
+                    console.log('✅ Temperature slider updated from global parameters:', window.TEMP_MIN, '-', window.TEMP_MAX, '(originals also reset)');
                 }
             });
 
@@ -1649,15 +1694,11 @@
                                         console.log('💾 Saved global variables to localStorage');
                                     }
                                     
-                                    // Update all displays on all pages immediately
-                                    console.log('🔄 Updating displays across all pages...');
-                                    setTimeout(() => {
-                                        window.dispatchEvent(new CustomEvent('globalParametersChanged', {
-                                            detail: { parameter: 'Temperature', min: window.TEMP_MIN, max: window.TEMP_MAX }
-                                        }));
-                                    }, 10);
+                                    // NOTE: Do NOT dispatch globalParametersChanged here!
+                                    // That event is only for problem changes, not manual adjustments.
+                                    // Dispatching it would trigger clearing of customThresholds.
                                     
-                                    console.log('✅ Temperature global variables updated:', window.TEMP_MIN, '-', window.TEMP_MAX);
+                                    console.log('✅ Global variables updated and saved');
                                 }
                             }
                         });

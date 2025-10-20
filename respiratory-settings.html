@@ -986,7 +986,24 @@
         // Initialize page when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
             initializePage();
+            
+            // Note: Manual adjustments clearing handled by globalParametersChanged event
+            const urlParams = new URLSearchParams(window.location.search);
+            const earlyPatientId = urlParams.get('patient');
+            
+            if (earlyPatientId && window.sharedDataManager) {
+                const medicalInfo = window.sharedDataManager.getPatientMedicalInfo(earlyPatientId);
+                const currentProblem = medicalInfo?.selectedProblem;
+                const lastKnownProblem = sessionStorage.getItem(`patient-${earlyPatientId}-lastKnownProblem`);
+                
+                if (!lastKnownProblem && currentProblem) {
+                    sessionStorage.setItem(`patient-${earlyPatientId}-lastKnownProblem`, currentProblem);
+                    console.log('INITIALIZED problem tracking:', currentProblem);
+                }
+            }
+            
             setupEventListeners();
+
             initializePneumonieTagState(); // Initialize pneumonie state FIRST
             
             // Initialize global variables system (simple approach)
@@ -1515,6 +1532,18 @@
                 console.log('🌐 Current global variables - AF:', window.AF_MIN, '-', window.AF_MAX, 'SAT:', window.SAT_MIN, '-', window.SAT_MAX);
                 console.log('🌐 Slider availability - afSlider:', !!afSlider, 'saturatieSlider:', !!saturatieSlider);
                 
+                // CRITICAL: Clear saved custom values from customThresholds for this patient
+                if (currentPatientId && window.sharedDataManager) {
+                    console.log('🗑️ EVENT: Clearing customThresholds before resetting to new problem defaults');
+                    const medicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId);
+                    if (medicalInfo && medicalInfo.customThresholds && medicalInfo.customThresholds.respiratoir) {
+                        delete medicalInfo.customThresholds.respiratoir.AF;
+                        delete medicalInfo.customThresholds.respiratoir.Saturatie;
+                        window.sharedDataManager.savePatientMedicalInfo(currentPatientId, medicalInfo);
+                        console.log('✅ EVENT: Custom thresholds cleared from medicalInfo');
+                    }
+                }
+                
                 // ROBUST APPROACH: Force complete slider refresh from global variables
                 if (afSlider && afSlider.config && afSlider.config.targetRange) {
                     console.log('🔄 Updating AF slider config and position...');
@@ -1523,10 +1552,13 @@
                     afSlider.config.targetRange.max = window.AF_MAX;
                     afSlider.currentMin = window.AF_MIN;
                     afSlider.currentMax = window.AF_MAX;
+                    // CRITICAL: Reset original values so slider doesn't think these are manual changes
+                    afSlider.originalMin = window.AF_MIN;
+                    afSlider.originalMax = window.AF_MAX;
                     if (afSlider.updateSliderPosition) {
                         afSlider.updateSliderPosition();
                     }
-                    console.log('✅ AF slider forced to:', window.AF_MIN, '-', window.AF_MAX);
+                    console.log('✅ AF slider forced to:', window.AF_MIN, '-', window.AF_MAX, '(originals also reset)');
                 } else {
                     console.log('❌ AF slider not available or not properly initialized');
                 }
@@ -1538,10 +1570,13 @@
                     saturatieSlider.config.targetRange.max = window.SAT_MAX;
                     saturatieSlider.currentMin = window.SAT_MIN;
                     saturatieSlider.currentMax = window.SAT_MAX;
+                    // CRITICAL: Reset original values so slider doesn't think these are manual changes
+                    saturatieSlider.originalMin = window.SAT_MIN;
+                    saturatieSlider.originalMax = window.SAT_MAX;
                     if (saturatieSlider.updateSliderPosition) {
                         saturatieSlider.updateSliderPosition();
                     }
-                    console.log('✅ Saturatie slider forced to:', window.SAT_MIN, '-', window.SAT_MAX);
+                    console.log('✅ Saturatie slider forced to:', window.SAT_MIN, '-', window.SAT_MAX, '(originals also reset)');
                 } else {
                     console.log('❌ Saturatie slider not available or not properly initialized');
                 }
