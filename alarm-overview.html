@@ -1173,12 +1173,38 @@
                         if (currentPatientId && window.sharedDataManager) {
                             // Use new tag parameter system for sepsis and pneumonie
                             if (condition === 'sepsis' || condition === 'pneumonie') {
-                                console.log(`🏷️ Deactivating ${condition} tag with parameter adjustments`);
+                                console.log(`🏷️ ALARM-OVERVIEW: Deactivating ${condition} tag with parameter adjustments`);
                                 window.sharedDataManager.toggleConditionTag(currentPatientId, condition, false);
                                 
+                                // CRITICAL: Sync displays immediately after tag deactivation
+                                setTimeout(() => {
+                                    console.log(`🔄 ALARM-OVERVIEW: Syncing displays after ${condition} deactivation...`);
+                                    syncDisplaysWithCentralizedRanges();
+                                    
+                                    // Apply highlighting to affected parameters (reverting to base values)
+                                    const valueNumbers = document.querySelectorAll('.value-number');
+                                    const afDisplay = document.getElementById('af-range-display-overview');
+                                    
+                                    if (condition === 'sepsis') {
+                                        // Sepsis affects HR and BP - highlight reversion
+                                        if (valueNumbers[0]) {
+                                            highlightParameterChange(valueNumbers[0], 'highlight-blue', 'Sepsis tag deactivated - reverted to base');
+                                        }
+                                        if (valueNumbers[1]) {
+                                            highlightParameterChange(valueNumbers[1], 'highlight-blue', 'Sepsis tag deactivated - reverted to base');
+                                        }
+                                        console.log('🎨 Applied highlighting to HR and BP (sepsis deactivation)');
+                                    } else if (condition === 'pneumonie') {
+                                        // Pneumonie affects AF only - highlight reversion
+                                        if (afDisplay) {
+                                            highlightParameterChange(afDisplay, 'highlight-blue', 'Pneumonie tag deactivated - reverted to base');
+                                        }
+                                        console.log('🎨 Applied highlighting to AF (pneumonie deactivation)');
+                                    }
+                                }, 100);
+                                
                                 // Update monitoring status labels after tag deselection
-                                // Use longer delay to ensure all events and circle updates have completed
-                                setTimeout(() => updateMonitoringStatus(), 100);
+                                setTimeout(() => updateMonitoringStatus(), 150);
                             } else {
                                 // Use old system for other conditions
                                 window.sharedDataManager.setPatientConditionState(condition, {
@@ -1198,12 +1224,38 @@
                         if (currentPatientId && window.sharedDataManager) {
                             // Use new tag parameter system for sepsis and pneumonie
                             if (condition === 'sepsis' || condition === 'pneumonie') {
-                                console.log(`🏷️ Activating ${condition} tag with parameter adjustments`);
+                                console.log(`🏷️ ALARM-OVERVIEW: Activating ${condition} tag with parameter adjustments`);
                                 window.sharedDataManager.toggleConditionTag(currentPatientId, condition, true);
                                 
+                                // CRITICAL: Sync displays immediately after tag activation
+                                setTimeout(() => {
+                                    console.log(`🔄 ALARM-OVERVIEW: Syncing displays after ${condition} activation...`);
+                                    syncDisplaysWithCentralizedRanges();
+                                    
+                                    // Apply highlighting to affected parameters
+                                    const valueNumbers = document.querySelectorAll('.value-number');
+                                    const afDisplay = document.getElementById('af-range-display-overview');
+                                    
+                                    if (condition === 'sepsis') {
+                                        // Sepsis affects HR and BP
+                                        if (valueNumbers[0]) {
+                                            highlightParameterChange(valueNumbers[0], 'highlight-blue', 'Sepsis tag activated');
+                                        }
+                                        if (valueNumbers[1]) {
+                                            highlightParameterChange(valueNumbers[1], 'highlight-blue', 'Sepsis tag activated');
+                                        }
+                                        console.log('🎨 Applied sepsis highlighting to HR and BP');
+                                    } else if (condition === 'pneumonie') {
+                                        // Pneumonie affects AF only
+                                        if (afDisplay) {
+                                            highlightParameterChange(afDisplay, 'highlight-blue', 'Pneumonie tag activated');
+                                        }
+                                        console.log('🎨 Applied pneumonie highlighting to AF');
+                                    }
+                                }, 100);
+                                
                                 // Update monitoring status labels after tag selection
-                                // Use longer delay to ensure all events and circle updates have completed
-                                setTimeout(() => updateMonitoringStatus(), 100);
+                                setTimeout(() => updateMonitoringStatus(), 150);
                             } else {
                                 // Use old system for other conditions
                                 window.sharedDataManager.setPatientConditionState(condition, {
