@@ -1848,6 +1848,12 @@
             // Call the main update function
             updateOrganCircles(true); // MANUAL PROBLEM CHANGE: Overwrite manual adjustments
             
+            // CRITICAL: Sync displays immediately after updating organ circles
+            setTimeout(() => {
+                console.log('🔄 ALARM-OVERVIEW: Syncing displays after problem change...');
+                syncDisplaysWithCentralizedRanges();
+            }, 100);
+            
             // Apply highlighting if this was a manual user change and the problem actually changed
             if (window.sharedDataManager?.isUserManuallyChangingProblem() && oldProblem !== selectedProblem && oldProblem) {
                 console.log('🎨 ALARM-OVERVIEW: User changed problem, applying highlighting after update...');
@@ -1903,7 +1909,7 @@
             const result = window.sharedDataManager.applyProblemSpecificMonitoring(
                 effectiveProblem, 
                 window.organComponents,
-                window.sharedDataManager.getCurrentPatientId(), // Pass patient ID to save target ranges
+                currentPatientId, // Use the local currentPatientId variable instead of getCurrentPatientId()
                 effectiveRiskLevel, // Use 'mid' as default when problem selected but no risk chosen
                 shouldOverwriteManualAdjustments // CRITICAL: Pass the flag to preserve/overwrite manual adjustments
             );

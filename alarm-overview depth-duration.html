@@ -2354,7 +2354,7 @@
             const result = window.sharedDataManager.applyProblemSpecificMonitoring(
                 effectiveProblem, 
                 window.organComponents,
-                window.sharedDataManager.getCurrentPatientId(), // Pass patient ID to save target ranges
+                currentPatientId, // Use the local currentPatientId variable instead of getCurrentPatientId()
                 effectiveRiskLevel, // Use 'mid' as default when problem selected but no risk chosen
                 shouldOverwriteManualAdjustments // CRITICAL: Pass the flag to preserve/overwrite manual adjustments
             );
