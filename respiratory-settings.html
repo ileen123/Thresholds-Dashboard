@@ -1532,18 +1532,6 @@
                 console.log('🌐 Current global variables - AF:', window.AF_MIN, '-', window.AF_MAX, 'SAT:', window.SAT_MIN, '-', window.SAT_MAX);
                 console.log('🌐 Slider availability - afSlider:', !!afSlider, 'saturatieSlider:', !!saturatieSlider);
                 
-                // CRITICAL: Clear saved custom values from customThresholds for this patient
-                if (currentPatientId && window.sharedDataManager) {
-                    console.log('🗑️ EVENT: Clearing customThresholds before resetting to new problem defaults');
-                    const medicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId);
-                    if (medicalInfo && medicalInfo.customThresholds && medicalInfo.customThresholds.respiratoir) {
-                        delete medicalInfo.customThresholds.respiratoir.AF;
-                        delete medicalInfo.customThresholds.respiratoir.Saturatie;
-                        window.sharedDataManager.savePatientMedicalInfo(currentPatientId, medicalInfo);
-                        console.log('✅ EVENT: Custom thresholds cleared from medicalInfo');
-                    }
-                }
-                
                 // ROBUST APPROACH: Force complete slider refresh from global variables
                 if (afSlider && afSlider.config && afSlider.config.targetRange) {
                     console.log('🔄 Updating AF slider config and position...');

@@ -1899,6 +1899,14 @@
                 const currentMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
                 currentMedicalInfo.selectedProblem = selectedProblem;
                 currentMedicalInfo.lastUpdated = new Date().toISOString();
+                
+                // CRITICAL: Clear all customThresholds when problem changes
+                // Manual adjustments should not persist across problem changes
+                if (currentMedicalInfo.customThresholds) {
+                    console.log('🗑️ PROBLEM CHANGE: Clearing all customThresholds');
+                    delete currentMedicalInfo.customThresholds;
+                }
+                
                 window.sharedDataManager.savePatientMedicalInfo(currentPatientId, currentMedicalInfo);
                 console.log('💾 ALARM-OVERVIEW: Saved new problem to medical info:', selectedProblem);
             }
@@ -1936,6 +1944,18 @@
             console.log('🔄 Current selectedProblem:', selectedProblem);
             console.log('🔄 Setting selectedRiskLevel to:', riskLevel);
             selectedRiskLevel = riskLevel;
+            
+            // CRITICAL: Clear all customThresholds when risk level changes
+            // Manual adjustments should not persist across risk level changes
+            if (currentPatientId && window.sharedDataManager) {
+                const currentMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
+                if (currentMedicalInfo.customThresholds) {
+                    console.log('🗑️ RISK LEVEL CHANGE: Clearing all customThresholds');
+                    delete currentMedicalInfo.customThresholds;
+                    window.sharedDataManager.savePatientMedicalInfo(currentPatientId, currentMedicalInfo);
+                }
+            }
+            
             console.log('🔄 Calling updateOrganCircles...');
             updateOrganCircles(true); // MANUAL RISK CHANGE: Overwrite manual adjustments
         }
