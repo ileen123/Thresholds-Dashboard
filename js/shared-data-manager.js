@@ -2312,7 +2312,7 @@ class SharedDataManager {
         const baseResult = this.applyProblemSpecificMonitoring(
             selectedProblem,
             null, // No organ components - just calculate ranges
-            null, // Don't save yet - we'll save the final result
+            patientId, // FIXED: Pass patientId so we use the correct current problem
             selectedRiskLevel,
             false // Don't overwrite manual adjustments during calculation
         );

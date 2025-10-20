@@ -1893,6 +1893,16 @@
             console.log('🎯 ALARM-OVERVIEW: Problem selected:', problemValue);
             selectedProblem = problemValue;
             
+            // CRITICAL FIX: Save the new problem to medical info immediately
+            // so that tag deactivation uses the correct current problem
+            if (currentPatientId && window.sharedDataManager) {
+                const currentMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
+                currentMedicalInfo.selectedProblem = selectedProblem;
+                currentMedicalInfo.lastUpdated = new Date().toISOString();
+                window.sharedDataManager.savePatientMedicalInfo(currentPatientId, currentMedicalInfo);
+                console.log('💾 ALARM-OVERVIEW: Saved new problem to medical info:', selectedProblem);
+            }
+            
             // Store old problem for highlighting comparison
             const oldProblem = window.previousSelectedProblem || '';
             window.previousSelectedProblem = selectedProblem;
