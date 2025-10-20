@@ -48,6 +48,10 @@
             100% { box-shadow: 0 0 0 0 rgba(99, 150, 255, 0); }
         }
     </style>
+        
+    <!-- WebSocket Communication Scripts -->
+    <script src="js/websocket-outbound-client.js"></script>
+    <script src="js/websocket-connection-manager.js"></script>
     
     <!-- Data Manager for cross-page data synchronization -->
     <script src="js/shared-data-manager.js"></script>
@@ -119,19 +123,19 @@
             <div class="tags-section">
                 <!-- All tags in horizontal layout with wrapping -->
                 <div class="button-group tags-horizontal">
-                    <button class="btn tag-btn" data-condition="sepsis" onclick="debugTagClick(this, 'sepsis')">
+                    <button class="btn tag-btn" data-condition="sepsis">
                         Sepsis <img src="svg's/sepsis.svg" alt="Sepsis" class="sepsis-icon">
                     </button>
-                    <button class="btn tag-btn" data-condition="diabetes" onclick="debugTagClick(this, 'diabetes')">
+                    <button class="btn tag-btn" data-condition="diabetes">
                         Diabetes <img src="svg's/diabetes.svg" alt="Diabetes" class="condition-icon">
                     </button>
-                    <button class="btn tag-btn" data-condition="herstellende" onclick="debugTagClick(this, 'herstellende')">
+                    <button class="btn tag-btn" data-condition="herstellende">
                         Herstellende <img src="svg's/patient_icon.svg" alt="Herstellende" class="condition-icon">
                     </button>
-                    <button class="btn tag-btn" data-condition="pneumonie" onclick="debugTagClick(this, 'pneumonie')">
+                    <button class="btn tag-btn" data-condition="pneumonie">
                         Pneumonie <img src="svg's/lung.svg" alt="Pneumonie" class="condition-icon">
                     </button>
-                    <button class="btn tag-btn" data-condition="chronisch-nierfalen" onclick="debugTagClick(this, 'chronisch-nierfalen')">
+                    <button class="btn tag-btn" data-condition="chronisch-nierfalen">
                         Chronisch Nierfalen <img src="svg's/nierfalen.svg" alt="Nierfalen" class="condition-icon">
                     </button>
                     <!-- More button to show additional options -->
@@ -150,7 +154,6 @@
             <!-- Circulatory system -->
             <div class="monitor-item">
                 <div class="monitor-label inactive-text">Circulatoir</div>
-
                 <!-- Circulatory parameters -->
                 <div class="value-card">
                     <div class="parameter-group">
@@ -167,7 +170,6 @@
             <!-- Respiratory system -->
             <div class="monitor-item">
                 <div class="monitor-label inactive-text">Respiratoir</div>
-
                 <!-- Respiratory parameters -->
                 <div class="value-card">
                     <div class="parameter-group">
@@ -184,7 +186,6 @@
             <!-- Other/Temperature system -->
             <div class="monitor-item">
                 <div class="monitor-label inactive-text">Overig</div>
-
                 <!-- Temperature parameters -->
                 <div class="value-card">
                     <div class="parameter-group">
@@ -207,86 +208,6 @@
             <!-- Import Heart Circle Component -->
             <script src="js/heart-circle-component.js"></script>
             <script>
-                // Debug function for tag clicks
-                function debugTagClick(button, condition) {
-                    console.log('🔥 DEBUG: onclick handler triggered!', condition, button);
-                    console.log('🔥 Button element:', button);
-                    console.log('🔥 Button classes:', button.classList.toString());
-                    console.log('🔥 Button dataset:', button.dataset);
-                    
-                    // Call the main tag handling logic
-                    handleTagClick(button, condition);
-                }
-                
-                // Main tag click handling logic
-                function handleTagClick(button, tagCondition) {
-                    console.log('🏷️ Processing tag condition:', tagCondition);
-                    
-                    if (button.classList.contains('selected')) {
-                        // Deselect tag
-                        button.classList.remove('selected');
-                        selectedTags = selectedTags.filter(tag => tag !== tagCondition);
-                        
-                        // Add visual feedback for deselection
-                        if (window.sharedDataManager) {
-                            window.sharedDataManager.highlightElement(button, 'highlight-red', 800);
-                        }
-                        
-                        // Handle condition deselection using new condition state system
-                        if (currentPatientId && window.sharedDataManager) {
-                            // Use new tag parameter system for sepsis and pneumonie
-                            if (tagCondition === 'sepsis' || tagCondition === 'pneumonie') {
-                                console.log(`🏷️ Deactivating ${tagCondition} tag with parameter adjustments (setup-page)`);
-                                window.sharedDataManager.toggleConditionTag(currentPatientId, tagCondition, false);
-                            } else {
-                                // Use old system for other conditions
-                                window.sharedDataManager.setPatientConditionState(tagCondition, {
-                                    isActive: false,
-                                    patientId: currentPatientId,
-                                    timestamp: Date.now(),
-                                    source: 'setup-page'
-                                });
-                            }
-                        }
-                    } else {
-                        // Select tag
-                        button.classList.add('selected');
-                        if (!selectedTags.includes(tagCondition)) {
-                            selectedTags.push(tagCondition);
-                        }
-                        
-                        // Add visual feedback for selection
-                        if (window.sharedDataManager) {
-                            window.sharedDataManager.highlightElement(button, 'highlight-blue', 800);
-                        }
-                        
-                        // Handle condition selection using new condition state system
-                        if (currentPatientId && window.sharedDataManager) {
-                            // Use new tag parameter system for sepsis and pneumonie
-                            if (tagCondition === 'sepsis' || tagCondition === 'pneumonie') {
-                                console.log(`🏷️ Activating ${tagCondition} tag with parameter adjustments (setup-page)`);
-                                window.sharedDataManager.toggleConditionTag(currentPatientId, tagCondition, true);
-                            } else {
-                                // Use old system for other conditions
-                                window.sharedDataManager.setPatientConditionState(tagCondition, {
-                                    isActive: true,
-                                    patientId: currentPatientId,
-                                    timestamp: Date.now(),
-                                    source: 'setup-page'
-                                });
-                            }
-                        }
-                    }
-                    
-                    window.dataManager?.setSelectedTags(selectedTags);
-                    
-                    // Apply parameter range updates for non-matrix tags
-                    if (tagCondition !== 'sepsis' && tagCondition !== 'pneumonie') {
-                        console.log('🔄 Updating parameter ranges for condition:', tagCondition);
-                        updateParameterRanges();
-                    }
-                }
-
                 // Global variables for current session
                 let selectedProblem = '';
                 let selectedRiskLevel = '';
@@ -394,6 +315,8 @@
                             // Create circle components after SharedDataManager is ready
                             await initializeCircleComponents();
                             
+                            console.log('✅ initializeCircleComponents completed, about to call setupEventListeners...');
+                            
                             // Set up event listeners
                             setupEventListeners();
                             
@@ -405,6 +328,63 @@
                         });
                         
                         async function initializeCircleComponents() {
+                            console.log('⏭️ Skipping circle component initialization (circles disabled in this version)');
+                            
+                            // Initialize empty organ components object so other code doesn't crash
+                            window.organComponents = {};
+                            
+                            // Return immediately without creating any circles
+                            return;
+                        }
+                        
+                        // Utility functions for dropdown and navigation
+                        function toggleDropdown() {
+                            const dropdown = document.getElementById('dropdownOptions');
+                            dropdown.classList.toggle('show');
+                        }
+                        
+                        function selectOption(value, text) {
+                            selectedProblem = value;
+                            document.querySelector('.dropdown-text').textContent = text;
+                            document.querySelector('.dropdown-text').classList.remove('placeholder');
+                            document.getElementById('dropdownOptions').classList.remove('show');
+                            
+                            // Trigger the problem selection
+                            if (window.sharedDataManager) {
+                                window.sharedDataManager.setUserChangingProblem(true);
+                            }
+                            
+                            if (currentPatientId && window.sharedDataManager) {
+                                const existingMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
+                                const updatedMedicalInfo = {
+                                    ...existingMedicalInfo,
+                                    selectedProblem: selectedProblem,
+                                    selectedRiskLevel: selectedRiskLevel,
+                                    selectedTags: selectedTags,
+                                    lastUpdated: new Date().toISOString()
+                                };
+                                window.sharedDataManager.savePatientMedicalInfo(currentPatientId, updatedMedicalInfo);
+                            }
+                            
+                            updateOrganCirclesBasedOnProblem(selectedProblem);
+                            updateProgressBar();
+                            
+                            if (window.sharedDataManager) {
+                                setTimeout(() => window.sharedDataManager.setUserChangingProblem(false), 100);
+                            }
+                        }
+                        
+                        function goBack() {
+                            window.history.back();
+                        }
+                        
+                        function confirmSettings() {
+                            console.log('Confirming settings...');
+                            // Add confirmation logic here
+                        }
+                        
+                        // DELETE OLD CIRCLE CODE BELOW
+                        function DELETE_OLD_CIRCLE_CODE() {
                             // Make all circles larger but still fit side by side
                             const circleSize = 130;
                             
@@ -698,47 +678,25 @@
                                 });
                             }
                             
-                         
-                            
                             // Set up tag button listeners
-                            console.log('🔍 DEBUG: About to query for .tag-btn elements');
-                            const tagButtons = document.querySelectorAll('.tag-btn');
-                            console.log('🔍 DEBUG: Found tag buttons:', tagButtons.length, tagButtons);
-                            
-                            // Additional debug: check if any elements were found
-                            if (tagButtons.length === 0) {
-                                console.error('❌ No tag buttons found! Checking DOM structure...');
-                                const allButtons = document.querySelectorAll('button');
-                                console.log('🔍 All buttons in document:', allButtons.length, allButtons);
-                                const tagsSection = document.querySelector('.tags-section');
-                                console.log('🔍 Tags section:', tagsSection);
-                                return; // Exit early if no buttons found
+                            console.log('🔍 Setting up tag button listeners...');
+                            const tagButtons = document.querySelectorAll('.tags-section .btn:not(.more-btn)');
+                            console.log('🔍 Found tag buttons:', tagButtons.length);
+                            if (tagButtons.length > 0) {
+                                console.log('🔍 First button:', tagButtons[0]);
+                                console.log('🔍 First button data-condition:', tagButtons[0].dataset.condition);
                             }
-                            
                             tagButtons.forEach((button, index) => {
-                                console.log(`🔍 DEBUG: Setting up listener for button ${index}:`, button.dataset.condition, button);
-                                
-                                // Test if button is clickable
-                                button.style.border = '2px solid red'; // Visual test
-                                console.log('🔍 Button classes:', button.classList.toString());
-                                console.log('🔍 Button data-condition:', button.dataset.condition);
-                                
-                                button.addEventListener('click', function(event) {
-                                    console.log('🔥 DEBUG: Tag button clicked!', this.dataset.condition, event);
-                                    console.log('🔥 Event target:', event.target);
-                                    console.log('🔥 Current target:', event.currentTarget);
-                                    const tagCondition = this.dataset.condition || this.textContent.trim(); // Use data-condition if available, fallback to text
-                                    console.log('🏷️ Processing tag condition:', tagCondition);
+                                console.log(`🔍 Setting up listener for button ${index}:`, button.dataset.condition);
+                                button.addEventListener('click', function() {
+                                    console.log('🔥 Tag button clicked!', this.dataset.condition);
+                                    const tagCondition = this.dataset.condition || this.textContent.trim();
+                                    const isDeselecting = this.classList.contains('selected');
                                     
-                                    if (this.classList.contains('selected')) {
+                                    if (isDeselecting) {
                                         // Deselect tag
                                         this.classList.remove('selected');
                                         selectedTags = selectedTags.filter(tag => tag !== tagCondition);
-                                        
-                                        // Add visual feedback for deselection
-                                        if (window.sharedDataManager) {
-                                            window.sharedDataManager.highlightElement(this, 'highlight-red', 800);
-                                        }
                                         
                                         // Handle condition deselection using new condition state system
                                         if (currentPatientId && window.sharedDataManager) {
@@ -763,19 +721,38 @@
                                             selectedTags.push(tagCondition);
                                         }
                                         
-                                        // Add visual feedback for selection
-                                        if (window.sharedDataManager) {
-                                            window.sharedDataManager.highlightElement(this, 'highlight-blue', 800);
-                                        }
-                                        
                                         // Handle condition selection using new condition state system
                                         if (currentPatientId && window.sharedDataManager) {
                                             // Use new tag parameter system for sepsis and pneumonie
                                             if (tagCondition === 'sepsis' || tagCondition === 'pneumonie') {
                                                 console.log(`🏷️ Activating ${tagCondition} tag with parameter adjustments (setup-page)`);
                                                 window.sharedDataManager.toggleConditionTag(currentPatientId, tagCondition, true);
+                                                
+                                                // Highlight the appropriate target ranges
+                                                setTimeout(() => {
+                                                    if (tagCondition === 'sepsis') {
+                                                        // Highlight HR and BP target ranges
+                                                        const valueNumbers = document.querySelectorAll('.value-number');
+                                                        if (valueNumbers[0]) { // HR
+                                                            window.sharedDataManager.highlightElement(valueNumbers[0], 'highlight-blue', 1500);
+                                                            console.log('✅ Highlighted HR range for sepsis');
+                                                        }
+                                                        if (valueNumbers[1]) { // BP
+                                                            window.sharedDataManager.highlightElement(valueNumbers[1], 'highlight-blue', 1500);
+                                                            console.log('✅ Highlighted BP range for sepsis');
+                                                        }
+                                                    } else if (tagCondition === 'pneumonie') {
+                                                        // Highlight AF target range only
+                                                        const afDisplay = document.getElementById('af-range-display');
+                                                        if (afDisplay) {
+                                                            window.sharedDataManager.highlightElement(afDisplay, 'highlight-blue', 1500);
+                                                            console.log('✅ Highlighted AF range for pneumonie');
+                                                        }
+                                                    }
+                                                }, 100);
                                             } else {
-                                                // Use old system for other conditions
+                                                // Use old system for other conditions (diabetes, herstellende, nierfalen)
+                                                // NO HIGHLIGHTING for these conditions
                                                 window.sharedDataManager.setPatientConditionState(tagCondition, {
                                                     isActive: true,
                                                     patientId: currentPatientId,
@@ -788,10 +765,39 @@
                                     
                                     window.dataManager?.setSelectedTags(selectedTags);
                                     
+                                    // WEBSOCKET FIX: Trigger websocket for non-sepsis/pneumonie tag changes
+                                    if (currentPatientId && window.sharedDataManager && tagCondition !== 'sepsis' && tagCondition !== 'pneumonie') {
+                                        setTimeout(() => {
+                                            const currentMedicalInfo = window.sharedDataManager.getPatientMedicalInfo(currentPatientId) || {};
+                                            currentMedicalInfo.selectedTags = selectedTags;
+                                            currentMedicalInfo.lastUpdated = new Date().toISOString();
+                                            window.sharedDataManager.savePatientMedicalInfo(currentPatientId, currentMedicalInfo);
+                                            console.log('📤 WEBSOCKET FIX: Non-matrix tag change triggered websocket for:', tagCondition, !isDeselecting ? 'SELECTED' : 'DESELECTED');
+                                        }, 100);
+                                    }
+                                    
                                     // Apply parameter range updates for non-matrix tags
                                     if (tagCondition !== 'sepsis' && tagCondition !== 'pneumonie') {
                                         console.log('🔄 Updating parameter ranges for condition:', tagCondition);
                                         updateParameterRanges();
+                                    }
+                                    
+                                    // BACKUP TIMEOUT: Ensure UI updates for unified tag system (sepsis/pneumonie)
+                                    if (tagCondition === 'sepsis' || tagCondition === 'pneumonie') {
+                                        setTimeout(() => {
+                                            console.log(`🔄 BACKUP (SETUP): Forcing UI refresh after ${tagCondition} ${!isDeselecting ? 'selection' : 'deselection'}...`);
+                                            syncDisplaysWithCentralizedRanges();
+                                            if (typeof updateSetupPageElements === 'function') updateSetupPageElements();
+                                            
+                                            // Circles disabled in this version - no organ circle updates needed
+                                            
+                                            // Additional backup after more time
+                                            setTimeout(() => {
+                                                console.log(`🔄 SECONDARY BACKUP (SETUP): Final UI refresh for ${tagCondition}...`);
+                                                syncDisplaysWithCentralizedRanges();
+                                                if (typeof updateSetupPageElements === 'function') updateSetupPageElements();
+                                            }, 100);
+                                        }, 150);
                                     }
                                 });
                             });
@@ -1293,7 +1299,7 @@
                         function isParameterAffectedByTag(parameter, tag) {
                             // Based on the tagMatrix in SharedDataManager, determine which parameters are affected by each tag
                             const tagParameterMap = {
-                                'sepsis': ['HR', 'BP_Mean', 'Temperature'], // Sepsis affects HR, BP_Mean, and Temperature (confirmed in SharedDataManager)
+                                'sepsis': ['HR', 'BP_Mean'], // Sepsis affects HR and BP_Mean only (Temperature highlighting removed)
                                 'pneumonie': ['AF', 'Saturatie', 'HR', 'BP_Mean', 'Temperature'] // Pneumonie affects AF, Saturatie, HR, BP_Mean, and Temperature
                             };
                             
