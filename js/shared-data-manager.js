@@ -591,6 +591,16 @@ class SharedDataManager {
             });
             console.log('✅ Cleared all parameter alarm states for patient:', patientId);
             
+            // CRITICAL FIX: Clear global problem/risk level selections to prevent them from
+            // contaminating the next patient's setup with old matrix values
+            localStorage.removeItem(this.storageKeys.SELECTED_PROBLEM);
+            localStorage.removeItem(this.storageKeys.SELECTED_RISK_LEVEL);
+            console.log('🧹 Cleared global problem and risk level selections');
+            
+            // Also clear global parameter variables from localStorage
+            localStorage.removeItem('globalParameterVariables');
+            console.log('🧹 Cleared global parameter variables');
+            
             // Clear any session-specific data for this patient
             const sessionData = this.getSessionData();
             if (sessionData && sessionData.currentPatient === patientId) {
@@ -1388,10 +1398,23 @@ class SharedDataManager {
             console.log('ℹ️ No organ components provided - calculating states only (normal for alarm-overview page)');
         }
         
+        // CRITICAL DEBUG: Check values BEFORE the if statement
+        console.log('🚨 BEFORE IF CHECK - patientId:', patientId, 'type:', typeof patientId);
+        console.log('🚨 BEFORE IF CHECK - targetRanges:', targetRanges);
+        console.log('🚨 BEFORE IF CHECK - targetRanges is object:', typeof targetRanges === 'object');
+        console.log('🚨 BEFORE IF CHECK - targetRanges keys:', targetRanges ? Object.keys(targetRanges) : 'NULL');
+        console.log('🚨 BEFORE IF CHECK - condition (patientId && targetRanges):', !!(patientId && targetRanges));
+        
         // Save target ranges for the patient if patientId is provided
         if (patientId && targetRanges) {
             this.savePatientTargetRanges(patientId, targetRanges);
             console.log('✅ Saved target ranges for patient:', patientId);
+            
+            // CRITICAL DEBUG: Check shouldOverwriteManualAdjustments value
+            console.log('🔍 CRITICAL CHECK - patientId:', patientId);
+            console.log('🔍 CRITICAL CHECK - targetRanges exists:', !!targetRanges);
+            console.log('🔍 CRITICAL CHECK - shouldOverwriteManualAdjustments:', shouldOverwriteManualAdjustments);
+            console.log('🔍 CRITICAL CHECK - typeof shouldOverwriteManualAdjustments:', typeof shouldOverwriteManualAdjustments);
             
             // UPDATE GLOBAL VARIABLES: Simple approach - update global variables directly
             if (shouldOverwriteManualAdjustments) {
@@ -1416,31 +1439,53 @@ class SharedDataManager {
                     });
                 }
                 
+                // CRITICAL DEBUG: Check what values are in targetRanges BEFORE setting
+                console.log('🔍 BEFORE SETTING - targetRanges.HR:', targetRanges.HR);
+                console.log('🔍 BEFORE SETTING - targetRanges.BP_Mean:', targetRanges.BP_Mean);
+                console.log('🔍 BEFORE SETTING - Current window.HR_MIN:', window.HR_MIN, 'window.HR_MAX:', window.HR_MAX);
+                console.log('🔍 BEFORE SETTING - Current window.BP_MIN:', window.BP_MIN, 'window.BP_MAX:', window.BP_MAX);
+                
                 // Update global variables with problem defaults
                 if (targetRanges.HR && targetRanges.HR.min !== '-') {
                     window.HR_MIN = targetRanges.HR.min;
                     window.HR_MAX = targetRanges.HR.max;
+                    console.log('✅ SET window.HR_MIN =', window.HR_MIN, 'window.HR_MAX =', window.HR_MAX);
+                    console.log('🔍 IMMEDIATELY AFTER SET - window.HR_MIN:', window.HR_MIN, 'window.HR_MAX:', window.HR_MAX);
                 }
                 if (targetRanges.BP_Mean && targetRanges.BP_Mean.min !== '-') {
                     window.BP_MIN = targetRanges.BP_Mean.min;
                     window.BP_MAX = targetRanges.BP_Mean.max;
+                    console.log('✅ SET window.BP_MIN =', window.BP_MIN, 'window.BP_MAX =', window.BP_MAX);
+                    console.log('🔍 IMMEDIATELY AFTER SET - window.BP_MIN:', window.BP_MIN, 'window.BP_MAX:', window.BP_MAX);
                 }
                 if (targetRanges.AF && targetRanges.AF.min !== '-') {
                     window.AF_MIN = targetRanges.AF.min;
                     window.AF_MAX = targetRanges.AF.max;
+                    console.log('✅ SET window.AF_MIN =', window.AF_MIN, 'window.AF_MAX =', window.AF_MAX);
                 }
                 if (targetRanges.Saturatie && targetRanges.Saturatie.min !== '-') {
                     window.SAT_MIN = targetRanges.Saturatie.min;
                     window.SAT_MAX = targetRanges.Saturatie.max;
+                    console.log('✅ SET window.SAT_MIN =', window.SAT_MIN, 'window.SAT_MAX =', window.SAT_MAX);
                 }
                 if (targetRanges.Temperature && targetRanges.Temperature.min !== '-') {
                     window.TEMP_MIN = targetRanges.Temperature.min;
                     window.TEMP_MAX = targetRanges.Temperature.max;
+                    console.log('✅ SET window.TEMP_MIN =', window.TEMP_MIN, 'window.TEMP_MAX =', window.TEMP_MAX);
                 }
+                
+                // CRITICAL FIX: Remove old cached values BEFORE saving new ones
+                // This prevents loadGlobalParameterVariables() from loading stale data
+                localStorage.removeItem('globalParameterVariables');
+                console.log('🗑️ Cleared old globalParameterVariables cache before saving new values');
                 
                 // Save to localStorage
                 this.saveGlobalParameterVariables();
                 console.log('📊 Global variables updated with main problem defaults');
+                console.log('💾 FINAL CHECK - Global variables after save:');
+                console.log('   HR:', window.HR_MIN, '-', window.HR_MAX);
+                console.log('   BP:', window.BP_MIN, '-', window.BP_MAX);
+                console.log('   AF:', window.AF_MIN, '-', window.AF_MAX);
                 console.log('🗑️ Cleared saved custom settings - sliders will use new defaults');
             } else {
                 console.log('🔒 Preserving existing manual adjustments - not overwriting global variables');
@@ -3048,13 +3093,21 @@ class SharedDataManager {
             console.log(`🧹 No existing conditions found or force clean requested for ${patientId}`);
             this.initializeCleanConditionStates(patientId);
             
-            // Also ensure target ranges start with normal defaults
-            const targetRangesKey = `${this.storageKeys.PATIENT_PREFIX}${patientId}_targetRanges`;
-            const existingRanges = localStorage.getItem(targetRangesKey);
-            if (!existingRanges || forceClean) {
-                const cleanRanges = this.getDefaultTargetRanges();
-                localStorage.setItem(targetRangesKey, JSON.stringify(cleanRanges));
-                console.log(`✅ Clean target ranges initialized for ${patientId}:`, cleanRanges);
+            // IMPORTANT: Delete any existing target ranges instead of initializing them
+            // Target ranges should only be set when user selects problem + risk level
+            // to prevent old values from persisting
+            if (forceClean) {
+                const targetRangesKey = `${this.storageKeys.PATIENT_PREFIX}${patientId}_targetRanges`;
+                localStorage.removeItem(targetRangesKey);
+                console.log(`🗑️ Removed old target ranges for fresh patient state: ${patientId}`);
+                
+                // Also remove from centralized app data
+                const appData = this.getAppData();
+                if (appData && appData.patients[patientId] && appData.patients[patientId].targetRanges) {
+                    delete appData.patients[patientId].targetRanges;
+                    this.saveAppData(appData);
+                    console.log(`🗑️ Removed target ranges from centralized app data for ${patientId}`);
+                }
             }
         } else {
             console.log(`✅ Existing condition states found for ${patientId}`);
