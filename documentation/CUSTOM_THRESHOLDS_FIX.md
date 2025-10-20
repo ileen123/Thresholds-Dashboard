@@ -1,17 +1,19 @@
 # Custom Thresholds Clearing - Final Solution
 
 ## Problem
-Manual slider adjustments were persisting even after changing the problem or risk level. They should only persist during normal navigation.
+Manual slider adjustments were persisting even after changing the problem or risk level. Additionally, after clearing customThresholds, sliders were defaulting to "respiratoire insufficientie" values instead of the current problem's values.
 
-## Root Cause
-The `customThresholds` data was being saved when users manually adjusted sliders, but was never being cleared when the problem or risk level changed. The slider component would reload these saved values on every page load, making manual adjustments "sticky" across problem changes.
+## Root Causes (Three Bugs)
+1. **customThresholds persistence**: The `customThresholds` data was being saved when users manually adjusted sliders, but was never being cleared when the problem or risk level changed.
+2. **Global variables initialization bug**: The `initializeGlobalParameterVariables()` function was looking for the problem in global localStorage instead of using the patient-specific medical info, causing it to always fall back to "respiratoire insufficientie" defaults.
+3. **Slider threshold configuration bug**: The `getThresholdsConfiguration()` and `getConfigData()` methods were hardcoded to use 'respiratoire-insufficientie' as the baseline problem, ignoring the patient's actual problem.
 
 ## Solution
 
-### Where customThresholds Are Cleared
+### 1. Clear customThresholds When Configuration Changes
 Custom thresholds are now cleared in **two specific places** on the `alarm-overview.html` page:
 
-1. **When Problem Changes** (`updateOrganCirclesBasedOnProblem` function):
+**When Problem Changes** (`updateOrganCirclesBasedOnProblem` function):
 ```javascript
 if (currentMedicalInfo.customThresholds) {
     console.log('🗑️ PROBLEM CHANGE: Clearing all customThresholds');
@@ -19,7 +21,7 @@ if (currentMedicalInfo.customThresholds) {
 }
 ```
 
-2. **When Risk Level Changes** (`updateOrganCirclesWithRisk` function):
+**When Risk Level Changes** (`updateOrganCirclesWithRisk` function):
 ```javascript
 if (currentMedicalInfo.customThresholds) {
     console.log('🗑️ RISK LEVEL CHANGE: Clearing all customThresholds');
@@ -27,7 +29,53 @@ if (currentMedicalInfo.customThresholds) {
 }
 ```
 
-### How globalParametersChanged Event Works
+### 2. Fix Global Variables Initialization
+Updated `initializeGlobalParameterVariables(patientId)` in `shared-data-manager.js` to:
+- Accept a `patientId` parameter
+- Get the problem from `medicalInfo.selectedProblem` for that patient
+- Use the correct problem's Matrix-based defaults instead of always defaulting to "respiratoire insufficientie"
+
+```javascript
+initializeGlobalParameterVariables(patientId = null) {
+    let currentProblem = '';
+    let currentRiskLevel = 'low';
+    
+    if (patientId) {
+        const medicalInfo = this.getPatientMedicalInfo(patientId);
+        currentProblem = medicalInfo?.selectedProblem || '';
+        currentRiskLevel = medicalInfo?.selectedRiskLevel || 'low';
+    }
+    
+    // Use problem-specific Matrix defaults...
+}
+```
+
+### 3. Fix Slider Threshold Configuration
+Updated `getConfigData(patientId)` and `getThresholdsConfiguration(overallRiskLevel, currentProblem)` in `shared-data-manager.js` to:
+- Accept patient-specific parameters
+- Get the problem from `medicalInfo.selectedProblem` for that patient
+- Use the patient's actual problem as the baseline for threshold configuration
+
+Also updated `getThresholdsByTags(tags, patientId)` in `shared-data-manager.js` and the slider component to pass the `patientId` when loading thresholds.
+
+```javascript
+getConfigData(patientId = null) {
+    let currentProblem = '';
+    if (patientId) {
+        const medicalInfo = this.getPatientMedicalInfo(patientId);
+        currentProblem = medicalInfo?.selectedProblem || '';
+    }
+    // Use patient's actual problem for threshold configuration...
+}
+
+getThresholdsConfiguration(overallRiskLevel = 'low', currentProblem = '') {
+    const normalProblem = currentProblem || 'respiratoire-insufficientie';
+    const normalRanges = this.getMatrixBasedBaseRanges(normalProblem, overallRiskLevel);
+    // Build configuration using patient's problem as baseline...
+}
+```
+
+### 3. globalParametersChanged Event (Display-Only)
 The `globalParametersChanged` event is now **display-only**. It:
 - ✅ Updates slider visual positions from global variables
 - ✅ Does NOT clear customThresholds
@@ -36,21 +84,25 @@ The `globalParametersChanged` event is now **display-only**. It:
 
 ### Files Modified
 
-1. **circulatoir-settings.html**
-   - Removed customThresholds clearing from `globalParametersChanged` event handler
-   - Event now only updates slider displays
-
-2. **respiratory-settings.html**
-   - Removed customThresholds clearing from `globalParametersChanged` event handler
-   - Event now only updates slider displays
-
-3. **other.html**
-   - Removed customThresholds clearing from `globalParametersChanged` event handler
-   - Event now only updates slider displays
-
-4. **alarm-overview.html**
+1. **alarm-overview.html**
    - Added customThresholds clearing when problem changes
    - Added customThresholds clearing when risk level changes
+
+2. **shared-data-manager.js**
+   - Fixed `initializeGlobalParameterVariables(patientId)` to use patient-specific problem
+   - Now correctly loads problem-based Matrix defaults instead of always using "respiratoire insufficientie"
+
+3. **circulatoir-settings.html**
+   - Removed customThresholds clearing from `globalParametersChanged` event handler
+   - Event now only updates slider displays
+
+4. **respiratory-settings.html**
+   - Removed customThresholds clearing from `globalParametersChanged` event handler
+   - Event now only updates slider displays
+
+5. **other.html**
+   - Removed customThresholds clearing from `globalParametersChanged` event handler
+   - Event now only updates slider displays
 
 ## Expected Behavior
 
@@ -61,12 +113,16 @@ The `globalParametersChanged` event is now **display-only**. It:
 4. User navigates back to circulatory page
 5. **Result**: Slider shows 80-110 (manual adjustment persisted)
 
-### Scenario 2: Problem Change Resets Sliders ✅
-1. User has manual adjustments (HR: 80-110)
-2. User changes problem from "Respiratory" to "Sepsis" on alarm-overview
+### Scenario 2: Problem Change Resets to Correct Defaults ✅
+1. Patient has problem "Hartfalen" with manual adjustments (HR: 80-110)
+2. User changes problem to "Sepsis" on alarm-overview
 3. `customThresholds` are cleared
 4. User navigates to circulatory settings
-5. **Result**: Slider shows Sepsis defaults (70-120), not manual 80-110
+5. `initializeGlobalParameterVariables(patientId)` is called
+6. Function gets problem "Sepsis" from patient's medicalInfo
+7. Sets global variables to Sepsis Matrix defaults (e.g., HR: 70-120)
+8. Slider initialized with Sepsis defaults
+9. **Result**: Slider shows Sepsis defaults (70-120), not manual 80-110 ✅
 
 ### Scenario 3: Risk Level Change Resets Sliders ✅
 1. User has manual adjustments (HR: 80-110)

@@ -663,7 +663,7 @@ class VitalParameterSlider {
                 
                 // Try to load from condition-based thresholds (sepsis, etc.)
                 if (medicalInfo && medicalInfo.selectedTags) {
-                    const thresholds = window.sharedDataManager.getThresholdsByTags(medicalInfo.selectedTags);
+                    const thresholds = window.sharedDataManager.getThresholdsByTags(medicalInfo.selectedTags, this.config.patientId);
                     
                     if (thresholds && this.config.parameter === 'HR' && thresholds.circulatoir?.HR) {
                         const hrThresholds = thresholds.circulatoir.HR;

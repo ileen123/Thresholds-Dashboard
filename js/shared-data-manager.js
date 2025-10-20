@@ -25,10 +25,22 @@ class SharedDataManager {
      * These variables are used consistently across all pages for displays and sliders
      * Now uses Matrix system exclusively - NO hardcoded defaults
      */
-    initializeGlobalParameterVariables() {
-        // Check if we have a selected problem to get Matrix-based defaults
-        const currentProblem = localStorage.getItem(this.storageKeys.SELECTED_PROBLEM) || '';
-        const currentRiskLevel = localStorage.getItem(this.storageKeys.SELECTED_RISK_LEVEL) || 'low';
+    initializeGlobalParameterVariables(patientId = null) {
+        // Get the current problem and risk level for this patient
+        let currentProblem = '';
+        let currentRiskLevel = 'low';
+        
+        if (patientId) {
+            // Get from patient's medical info
+            const medicalInfo = this.getPatientMedicalInfo(patientId);
+            currentProblem = medicalInfo?.selectedProblem || '';
+            currentRiskLevel = medicalInfo?.selectedRiskLevel || 'low';
+            console.log(`📊 Patient ${patientId} - Problem: ${currentProblem}, Risk: ${currentRiskLevel}`);
+        } else {
+            // Fallback to global storage (for backward compatibility)
+            currentProblem = localStorage.getItem(this.storageKeys.SELECTED_PROBLEM) || '';
+            currentRiskLevel = localStorage.getItem(this.storageKeys.SELECTED_RISK_LEVEL) || 'low';
+        }
         
         let matrixDefaults = {};
         if (currentProblem && currentProblem !== '' && currentProblem !== 'none') {
@@ -723,9 +735,18 @@ class SharedDataManager {
     /**
      * Get configuration data including circle configurations
      */
-    getConfigData() {
-        // Get current risk level for dynamic thresholds
-        const currentRiskLevel = localStorage.getItem(this.storageKeys.SELECTED_RISK_LEVEL) || 'low';
+    getConfigData(patientId = null) {
+        let currentRiskLevel = 'low';
+        let currentProblem = '';
+        
+        if (patientId) {
+            const medicalInfo = this.getPatientMedicalInfo(patientId);
+            currentRiskLevel = medicalInfo?.selectedRiskLevel || 'low';
+            currentProblem = medicalInfo?.selectedProblem || '';
+        } else {
+            // Fallback to global (for legacy code)
+            currentRiskLevel = localStorage.getItem(this.storageKeys.SELECTED_RISK_LEVEL) || 'low';
+        }
         
         // Return the config data structure that matches config.json
         return {
@@ -758,7 +779,7 @@ class SharedDataManager {
             },
             
             // Dynamic thresholds configuration - generated directly from Matrix system
-            thresholds: this.getThresholdsConfiguration(currentRiskLevel)
+            thresholds: this.getThresholdsConfiguration(currentRiskLevel, currentProblem)
         };
     }
 
@@ -767,18 +788,19 @@ class SharedDataManager {
      * Generates thresholds configuration directly from the Matrix system
      * This eliminates duplicate data and ensures changes to the Matrix immediately take effect
      * @param {string} overallRiskLevel - Risk level for intensity scaling (default: 'low')
+     * @param {string} currentProblem - Current patient problem (if known)
      * @returns {Object} - Dynamic thresholds configuration generated from Matrix
      */
-    getThresholdsConfiguration(overallRiskLevel = 'low') {
-        console.log(`📊 Generating dynamic thresholds configuration from Matrix (risk: ${overallRiskLevel})`);
+    getThresholdsConfiguration(overallRiskLevel = 'low', currentProblem = '') {
+        console.log(`📊 Generating dynamic thresholds configuration from Matrix (risk: ${overallRiskLevel}, problem: ${currentProblem || 'default'})`);
+        
+        // Use patient's actual problem if available, otherwise default to respiratory
+        const normalProblem = currentProblem || 'respiratoire-insufficientie';
         
         // Get base ranges from Matrix for each condition type
-        const respiratoryRanges = this.getMatrixBasedBaseRanges('respiratoire-insufficientie', overallRiskLevel);
+        const normalRanges = this.getMatrixBasedBaseRanges(normalProblem, overallRiskLevel);
         const cardiacRanges = this.getMatrixBasedBaseRanges('hart-falen', overallRiskLevel);
         const sepsisRanges = this.getMatrixBasedBaseRanges('sepsis', overallRiskLevel);
-        
-        // Use respiratory ranges as "normal" baseline (most general condition)
-        const normalRanges = respiratoryRanges;
         
         // Build dynamic configuration directly from Matrix
         const dynamicConfig = {
@@ -805,14 +827,14 @@ class SharedDataManager {
                 pneumonie: {
                     respiratoire: {
                         // Pneumonia uses respiratory baseline from Matrix
-                        AF: { min: respiratoryRanges.AF?.min, max: respiratoryRanges.AF?.max }
+                        AF: { min: normalRanges.AF?.min, max: normalRanges.AF?.max }
                     }
                 }
             }
         };
         
-        console.log(`✅ Dynamic thresholds generated from Matrix:`, dynamicConfig);
-        console.log(`📋 Source Matrix ranges - Respiratory: HR(${normalRanges.HR?.min}-${normalRanges.HR?.max}), Sepsis: HR(${sepsisRanges.HR?.min}-${sepsisRanges.HR?.max})`);
+        console.log(`✅ Dynamic thresholds generated from Matrix using ${normalProblem}:`, dynamicConfig);
+        console.log(`📋 Source Matrix ranges - ${normalProblem}: HR(${normalRanges.HR?.min}-${normalRanges.HR?.max}), Sepsis: HR(${sepsisRanges.HR?.min}-${sepsisRanges.HR?.max})`);
         
         return dynamicConfig;
     }
@@ -2482,16 +2504,26 @@ class SharedDataManager {
      * Get thresholds by tags (for dynamic threshold updates)
      * Now uses Matrix system exclusively - NO hardcoded fallbacks
      */
-    getThresholdsByTags(tags) {
-        const config = this.getConfigData();
+    getThresholdsByTags(tags, patientId = null) {
+        const config = this.getConfigData(patientId);
         
         // Add error handling for missing thresholds configuration
         if (!config || !config.thresholds || !config.thresholds.normal) {
             console.warn('⚠️ Missing thresholds configuration in getConfigData() - using Matrix system');
             
             // Use Matrix system instead of hardcoded values
-            const currentRiskLevel = localStorage.getItem(this.storageKeys.SELECTED_RISK_LEVEL) || 'low';
-            const currentProblem = localStorage.getItem(this.storageKeys.SELECTED_PROBLEM) || '';
+            let currentRiskLevel = 'low';
+            let currentProblem = '';
+            
+            if (patientId) {
+                const medicalInfo = this.getPatientMedicalInfo(patientId);
+                currentRiskLevel = medicalInfo?.selectedRiskLevel || 'low';
+                currentProblem = medicalInfo?.selectedProblem || '';
+            } else {
+                // Fallback to global (for legacy code)
+                currentRiskLevel = localStorage.getItem(this.storageKeys.SELECTED_RISK_LEVEL) || 'low';
+                currentProblem = localStorage.getItem(this.storageKeys.SELECTED_PROBLEM) || '';
+            }
             
             if (currentProblem && currentProblem !== '' && currentProblem !== 'none') {
                 const matrixRanges = this.getMatrixBasedBaseRanges(currentProblem, currentRiskLevel);
