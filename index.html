@@ -40,22 +40,7 @@
             gap: 10px;
         }
 
-        .header-btn {
-            background-color: #ffffff;
-            border: 2px solid #FF6B35;
-            color: #FF6B35;
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .header-btn:hover {
-            background-color: #FF6B35;
-            color: white;
-        }
+        /* Removed old header-btn styles - now using the styles below */
 
         .header-buttons {
             display: flex;
@@ -68,11 +53,13 @@
             color: white;
             border: none;
             border-radius: 20px;
-            cursor: pointer;
+            cursor: default;
             font-size: 14px;
+            font-weight: 400;
             display: flex;
             align-items: center;
             gap: 8px;
+            pointer-events: none;
         }
 
         .header-btn::after {

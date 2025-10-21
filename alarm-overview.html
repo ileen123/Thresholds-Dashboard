@@ -121,16 +121,16 @@
                     <button class="btn tag-btn" data-condition="sepsis">
                         Sepsis <img src="svg's/sepsis.svg" alt="Sepsis" class="sepsis-icon">
                     </button>
-                    <button class="btn tag-btn" data-condition="diabetes">
+                    <button class="btn tag-btn inactive" data-condition="diabetes" disabled>
                         Diabetes <img src="svg's/diabetes.svg" alt="Diabetes" class="condition-icon">
                     </button>
-                    <button class="btn tag-btn" data-condition="herstellende">
+                    <button class="btn tag-btn inactive" data-condition="herstellende" disabled>
                         Herstellende <img src="svg's/patient_icon.svg" alt="Herstellende" class="condition-icon">
                     </button>
                     <button class="btn tag-btn" data-condition="pneumonie">
                         Pneumonie <img src="svg's/lung.svg" alt="Pneumonie" class="condition-icon">
                     </button>
-                    <button class="btn tag-btn" data-condition="chronisch-nierfalen">
+                    <button class="btn tag-btn inactive" data-condition="chronisch-nierfalen" disabled>
                         Chronisch Nierfalen <img src="svg's/nierfalen.svg" alt="Nierfalen" class="condition-icon">
                     </button>
                     <!-- More button to show additional options -->
@@ -1163,6 +1163,12 @@
             // Event listeners for tag buttons (matching setup page structure)
             document.querySelectorAll('.tag-btn').forEach(button => {
                 button.addEventListener('click', function() {
+                    // Ignore clicks on inactive buttons
+                    if (this.classList.contains('inactive') || this.disabled) {
+                        console.log('🚫 Ignoring click on inactive button:', this.dataset.condition);
+                        return;
+                    }
+                    
                     const condition = this.dataset.condition;
                     if (this.classList.contains('selected')) {
                         // Deselect tag

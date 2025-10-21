@@ -61,7 +61,7 @@
                 <h3 class="info-title">Overige additionele informatie:</h3>
                 <div class="circulatory-tags-section">
                 <!-- Temperature monitoring tags could go here in the future -->
-                    <button class="btn tag-btn" data-condition="herstellende">
+                    <button class="btn tag-btn inactive" data-condition="herstellende" disabled>
                         Herstellende <img src="svg's/patient_icon.svg" alt="Herstellende" class="condition-icon">
                     </button>
                     <button class="circulatory-more-btn">⋯</button>
@@ -1589,6 +1589,12 @@
             const tagButtons = document.querySelectorAll('.tag-btn');
             tagButtons.forEach(button => {
                 button.addEventListener('click', function() {
+                    // Ignore clicks on inactive buttons
+                    if (this.classList.contains('inactive') || this.disabled) {
+                        console.log('🚫 Ignoring click on inactive button:', this.dataset.condition);
+                        return;
+                    }
+                    
                     const condition = this.dataset.condition;
                     
                     if (this.classList.contains('selected')) {

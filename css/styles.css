@@ -518,6 +518,22 @@ body {
     filter: brightness(0) saturate(100%) invert(1);
 }
 
+/* Inactive tag buttons - for future features not yet implemented */
+.btn.tag-btn.inactive {
+    background-color: #f5f5f500; /* Light grey background */
+    color: #4a4a4a67; /* Light grey text */
+    border-color: #4a4a4a67; /* Light grey border */
+    cursor: not-allowed; /* Show not-allowed cursor */
+    opacity: 0.6; /* Reduce opacity */
+    pointer-events: none; /* Disable all pointer events */
+}
+
+/* Inactive button icons should also be greyed out */
+.btn.tag-btn.inactive .condition-icon,
+.btn.tag-btn.inactive .sepsis-icon {
+    filter: brightness(0) saturate(0%) opacity(0.4); /* Grey out icons */
+}
+
 /* =============================================================================
    5. CUSTOM DROPDOWN STYLING
 ============================================================================= */
